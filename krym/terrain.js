@@ -263,10 +263,6 @@ export function makeRoute(points, heightAt) {
 export function makePins(points, heightAt) {
   const g = new THREE.Group(); const pins = [];
   const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,225,160,1)'); gr.addColorStop(0.25, 'rgba(255,205,120,0.55)'); gr.addColorStop(1, 'rgba(255,190,100,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace; return t; })();
-  // столб света: снизу яркий, к верху тает, по ширине мягкий; в мировых единицах, чтобы на подлёте вырастал
-  const beamTex = (() => { const w = 32, h = 128; const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); const im = x.createImageData(w, h);
-    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const dx = (i + 0.5 - w / 2) / (w / 2); const v = Math.pow(1 - j / h, 0.45) * Math.exp(-dx * dx * 5.0); const o = (j * w + i) * 4; im.data[o] = 255; im.data[o + 1] = 244; im.data[o + 2] = 214; im.data[o + 3] = Math.round(255 * Math.min(1, v)); }
-    x.putImageData(im, 0, 0); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace; return t; })();
   // ядро: белое зерно с тёмным ободком — читается и на золотой земле, и на белом облаке; размер в пикселях экрана
   const coreTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
     gr.addColorStop(0, 'rgba(255,250,236,1)'); gr.addColorStop(0.26, 'rgba(255,238,200,1)'); gr.addColorStop(0.34, 'rgba(30,22,14,0.9)'); gr.addColorStop(0.5, 'rgba(30,22,14,0.45)'); gr.addColorStop(0.7, 'rgba(30,22,14,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace; return t; })();
@@ -274,9 +270,8 @@ export function makePins(points, heightAt) {
     const y0 = heightAt(p.x, p.z), top = y0 + 2.6;
     const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(p.x, y0, p.z), new THREE.Vector3(p.x, top, p.z)]);
     const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xfff0d0, transparent: true, opacity: 0.5, depthTest: true, depthWrite: false })); line.frustumCulled = false; line.renderOrder = 1;
-    const beam = new THREE.Sprite(new THREE.SpriteMaterial({ map: beamTex, color: 0xffeecc, transparent: true, opacity: 0.5, depthTest: false, depthWrite: false, sizeAttenuation: true, blending: THREE.AdditiveBlending })); beam.center.set(0.5, 0); beam.position.set(p.x, y0, p.z); beam.scale.set(0.5, 3.0, 1); beam.renderOrder = 2;
     const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: coreTex, color: 0xffffff, transparent: true, opacity: 0.9, depthTest: false, depthWrite: false, sizeAttenuation: false })); spr.position.set(p.x, top, p.z); spr.scale.set(0.02, 0.02, 1); spr.renderOrder = 3;
-    g.add(line, beam, spr); pins.push({ line, spr, beam, top: new THREE.Vector3(p.x, top, p.z), base: new THREE.Vector3(p.x, y0, p.z) });
+    g.add(line, spr); pins.push({ line, spr, top: new THREE.Vector3(p.x, top, p.z), base: new THREE.Vector3(p.x, y0, p.z) });
   }
   // комета: бежит по маршруту, пока он прочерчивается на восходе
   const comet = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffe8b0, transparent: true, opacity: 0, depthTest: false, depthWrite: false, sizeAttenuation: false, blending: THREE.AdditiveBlending })); comet.scale.set(0.09, 0.09, 1); comet.renderOrder = 3; g.add(comet);

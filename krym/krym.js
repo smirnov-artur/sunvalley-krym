@@ -186,7 +186,7 @@ precision highp float;
 in vec3 position; in vec2 uv;
 uniform mat4 projectionMatrix; uniform mat4 modelViewMatrix; uniform sampler2D uDepth; uniform float uDepthScale; uniform sampler2D uNoise; uniform float uTime;
 out vec2 vUv; out float vZ; out float vCloud;
-void main(){ vUv = uv; float d = textureLod(uDepth, uv, 2.5).r; vec3 p = position; p.z = (d - 0.5) * uDepthScale - 0.05; vZ = p.z;
+void main(){ vUv = uv; float d = textureLod(uDepth, uv, 2.5).r; vec3 p = position; float ek = smoothstep(0.0, 0.05, min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y))); p.z = ((d - 0.5) * uDepthScale - 0.05) * ek; vZ = p.z;   // у кромки рельеф глубины гаснет: край полотна остаётся ровным прямоугольником
   // свет облаков: медленное дыхание освещённости по полотну
   vCloud = textureLod(uNoise, uv * 0.7 + vec2(uTime * 0.004, uTime * 0.0025), 0.0).r * 2.0 - 1.0;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0); }
@@ -195,7 +195,7 @@ const UNDER_FRAG = /* glsl */`
 precision highp float; in vec2 vUv; in float vZ; in float vCloud;
 uniform sampler2D uImg; uniform sampler2D uMask; uniform sampler2D uNoise; uniform vec3 uHaze; uniform float uHazeK; uniform float uDepthScale; uniform vec3 uLight; uniform vec3 uLightCol; uniform float uTime; uniform float uShow;
 uniform vec4 uFx; uniform float uLife; uniform float uGust; uniform float uFlicker; uniform float uGloss; uniform float uExposure;
-uniform sampler2D uNow; uniform vec4 uNowFit; uniform float uWipe; uniform float uHazeBoost; uniform vec2 uFlowW; uniform vec2 uFlowS; uniform float uWarm;
+uniform sampler2D uNow; uniform vec4 uNowFit; uniform float uWipe; uniform float uHazeBoost; uniform vec2 uFlowW; uniform vec2 uFlowS; uniform float uWarm; uniform vec4 uFall; uniform float uFallV;
 out vec4 outColor;
 vec4 nz(vec2 p){ return texture(uNoise, p) * 2.0 - 1.0; }
 void main(){
@@ -212,6 +212,11 @@ void main(){
   vec2 flow = (uFlowW * 0.0075 * m.r * uFx.x + uFlowS * 0.0055 * m.g * uFx.y) * edgeK;
   vec2 uvA = uv + fol + flow * ph + ripple, uvB = uv + fol + flow * ph2 - ripple;
   vec3 src = mix(texture(uImg, uvA).rgb, texture(uImg, uvB).rgb, wgt);
+  // водопад: внутри своей области те же мазки едут вниз быстрой петлёй (две фазы в противофазе), по краям области плавно
+  float inFall = 0.0;
+  if (uFallV > 0.001) { vec2 f0 = smoothstep(vec2(0.0), vec2(0.025), uv - uFall.xy), f1 = smoothstep(vec2(0.0), vec2(0.025, 0.08), uFall.zw - uv);   // у кромки обрыва смещение гаснет шире, чтобы верх струи не дёргался inFall = f0.x * f0.y * f1.x * f1.y * uLife;
+    if (inFall > 0.001) { float pf = fract(t * 0.55), pf2 = fract(pf + 0.5); float wf2 = abs(pf * 2.0 - 1.0); vec2 fv = vec2(0.0, 0.05 * uFallV) * inFall; vec2 jit = (nz(uv * vec2(40.0, 8.0) + vec2(0.0, t * 0.9)).rg) * 0.002 * inFall;
+      vec3 sF = mix(texture(uImg, uv + fv * pf + jit).rgb, texture(uImg, uv + fv * pf2 + jit).rgb, wf2); src = mix(src, sF, inFall); } }
   vec3 col = pow(src, vec3(2.2)) * uExposure;
   float lum = dot(src, vec3(0.3, 0.59, 0.11));
   // лак и паста: рельеф из самой живописи (градиент светлоты), по нему ходит блик
@@ -226,6 +231,8 @@ void main(){
   // блики на воде: бегущие искры там, где вода и так светлая
   float sp = pow(max(nz(uv * vec2(24.0, 48.0) + vec2(t * 0.09, -t * 0.04)).r, 0.0), 5.0) * m.r * uFx.x * smoothstep(0.25, 0.7, lum);
   col += pow(uLightCol, vec3(2.2)) * sp * 0.6;
+  // водопад: бегущие вниз прожилки пены и мягкая водяная пыль у подножия
+  if (inFall > 0.001) { float st = pow(max(nz(uv * vec2(60.0, 6.0) + vec2(0.0, t * 1.4)).b, 0.0), 3.0); float foot = 1.0 - smoothstep(uFall.y, uFall.y + 0.12, uv.y); col += vec3(0.9, 0.92, 0.95) * (st * 0.10 + foot * 0.06 * (0.6 + 0.4 * nz(uv * 12.0 + t * 0.2).a)) * inFall * smoothstep(0.3, 0.8, lum); }
   // свет облаков по земле
   col *= 1.0 + 0.05 * uFx.y * uLife * vCloud * (1.0 - m.g);
   // свет теплеет за время главы (рассвет внутри картины)
@@ -423,7 +430,7 @@ function makeNoiseTex() {
 // режиссура по главам: куда идёт вода и облака, теплеет ли свет, как ведёт камера (смещение в долях ширины и зум: от → к)
 const DIR = {
   _:        { flowW: [1, 0.05], flowS: [1, 0.1], warm: 0, cam: [0, 0, 1.0, 0, 0, 0.84] },
-  sugdeya:  { flowW: [0.7, -0.4], flowS: [1, 0.05], warm: 0.2, cam: [-0.07, 0.01, 1.02, 0.05, -0.01, 0.84] },
+  sugdeya:  { flowW: [0.7, -0.4], flowS: [1, 0.05], warm: 0.2, cam: [-0.07, 0.01, 1.02, 0.05, -0.01, 0.84], fall: [0.60, 0.23, 0.73, 0.46], fallV: 1.0 },
   feodosia: { flowW: [0.6, -0.6], flowS: [1, 0], warm: 0.35, cam: [-0.08, 0.02, 1.0, 0.10, -0.02, 0.86], sun: [0.5, 0.8], rays: 0.2 },
   sudak:    { flowW: [1, 0], flowS: [0.8, 0.1], warm: 0.1, cam: [0.08, 0.02, 1.0, -0.06, -0.01, 0.85] },
   balaklava:{ flowW: [0.5, -0.3], flowS: [1, 0.15], warm: 0, cam: [-0.08, 0.03, 1.0, 0.08, -0.02, 0.86] },
@@ -543,7 +550,7 @@ function createRenderer(canvas, map, T) {
   const paintScene = new THREE.Scene();
   const brush = makeBrushAtlas();
   const noiseTex = getNoise(); const blankMask = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1, THREE.RGBAFormat); blankMask.needsUpdate = true;
-  const uS = { uTime: { value: 0 }, uAssemble: { value: 1 }, uStrokeA: { value: 0 }, uShow: { value: 1 }, uFx: { value: new THREE.Vector4(1, 1, 1, 1) }, uHazeBoost: { value: 0 }, uGloss: { value: 0.1 }, uExposure: { value: 1 }, uFlowW: { value: new THREE.Vector2(1, 0.05) }, uFlowS: { value: new THREE.Vector2(1, 0.1) }, uWarm: { value: 0 }, uLife: { value: reduced ? 0 : 1 }, uGust: { value: 0 }, uFlicker: { value: 0 }, uBreath: { value: reduced ? 0 : 0.006 }, uBrush: { value: brush }, uLight: { value: new THREE.Vector3(-0.5, 0.5, 0.7) }, uLightCol: { value: new THREE.Vector3(1.0, 0.9, 0.7) }, uHaze: { value: new THREE.Vector3(0.6, 0.5, 0.4) }, uHazeK: { value: 0.3 }, uCam: { value: paintCam.position }, uGloss: { value: 0.55 }, uDepthScale: { value: DEPTH } };
+  const uS = { uTime: { value: 0 }, uAssemble: { value: 1 }, uStrokeA: { value: 0 }, uShow: { value: 1 }, uFx: { value: new THREE.Vector4(1, 1, 1, 1) }, uHazeBoost: { value: 0 }, uGloss: { value: 0.1 }, uExposure: { value: 1 }, uFlowW: { value: new THREE.Vector2(1, 0.05) }, uFlowS: { value: new THREE.Vector2(1, 0.1) }, uWarm: { value: 0 }, uFall: { value: new THREE.Vector4(0, 0, 0, 0) }, uFallV: { value: 0 }, uLife: { value: reduced ? 0 : 1 }, uGust: { value: 0 }, uFlicker: { value: 0 }, uBreath: { value: reduced ? 0 : 0.006 }, uBrush: { value: brush }, uLight: { value: new THREE.Vector3(-0.5, 0.5, 0.7) }, uLightCol: { value: new THREE.Vector3(1.0, 0.9, 0.7) }, uHaze: { value: new THREE.Vector3(0.6, 0.5, 0.4) }, uHazeK: { value: 0.3 }, uCam: { value: paintCam.position }, uGloss: { value: 0.55 }, uDepthScale: { value: DEPTH } };
   const strokeMat = new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, uniforms: uS, vertexShader: STROKE_VERT, fragmentShader: STROKE_FRAG, transparent: true, depthTest: false, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor });
   const quadPos = new THREE.Float32BufferAttribute([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0], 3), quadUv = new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2);
   const underMatBase = { glslVersion: THREE.GLSL3, vertexShader: UNDER_VERT, fragmentShader: UNDER_FRAG, depthTest: false, depthWrite: false, transparent: true, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor };
@@ -563,7 +570,7 @@ function createRenderer(canvas, map, T) {
     { const cv = document.createElement('canvas'); cv.width = 32; cv.height = 18; const cx = cv.getContext('2d', { willReadFrequently: true }); cx.drawImage(img.el, 0, 0, 32, 18); const d = cx.getImageData(0, 0, 32, 18).data; let l = 0; for (let i = 0; i < d.length; i += 4) l += 0.3 * d[i] + 0.59 * d[i + 1] + 0.11 * d[i + 2]; S.lum = l / (d.length / 4) / 255; }
     const texImg = new THREE.Texture(img.el); texImg.colorSpace = THREE.NoColorSpace; texImg.minFilter = THREE.LinearMipmapLinearFilter; texImg.generateMipmaps = true; texImg.anisotropy = 8; texImg.needsUpdate = true;
     const texDepth = new THREE.Texture(depthImg.el); texDepth.colorSpace = THREE.NoColorSpace; texDepth.minFilter = THREE.LinearMipmapLinearFilter; texDepth.magFilter = THREE.LinearFilter; texDepth.generateMipmaps = true; texDepth.needsUpdate = true;
-    const um = new THREE.RawShaderMaterial({ ...underMatBase, uniforms: { uDepth: { value: texDepth }, uImg: { value: texImg }, uHaze: uS.uHaze, uHazeK: uS.uHazeK, uDepthScale: uS.uDepthScale, uLight: uS.uLight, uTime: uS.uTime, uShow: uS.uShow, uMask: { value: blankMask }, uNoise: { value: noiseTex }, uNow: { value: blankMask }, uNowFit: { value: new THREE.Vector4(1, 1, 0, 0) }, uWipe: { value: 0 }, uHazeBoost: uS.uHazeBoost, uGloss: uS.uGloss, uExposure: uS.uExposure, uFlowW: uS.uFlowW, uFlowS: uS.uFlowS, uWarm: uS.uWarm, uFx: uS.uFx, uLife: uS.uLife, uGust: uS.uGust, uFlicker: uS.uFlicker, uLightCol: uS.uLightCol } });
+    const um = new THREE.RawShaderMaterial({ ...underMatBase, uniforms: { uDepth: { value: texDepth }, uImg: { value: texImg }, uHaze: uS.uHaze, uHazeK: uS.uHazeK, uDepthScale: uS.uDepthScale, uLight: uS.uLight, uTime: uS.uTime, uShow: uS.uShow, uMask: { value: blankMask }, uNoise: { value: noiseTex }, uNow: { value: blankMask }, uNowFit: { value: new THREE.Vector4(1, 1, 0, 0) }, uWipe: { value: 0 }, uHazeBoost: uS.uHazeBoost, uGloss: uS.uGloss, uExposure: uS.uExposure, uFlowW: uS.uFlowW, uFlowS: uS.uFlowS, uWarm: uS.uWarm, uFall: uS.uFall, uFallV: uS.uFallV, uFx: uS.uFx, uLife: uS.uLife, uGust: uS.uGust, uFlicker: uS.uFlicker, uLightCol: uS.uLightCol } });
     const under = new THREE.Mesh(new THREE.PlaneGeometry(W, Hh, 180, 100), um); under.renderOrder = 1; under.frustumCulled = false; under.visible = false;
     paintScene.add(under, mesh); S.mesh = mesh; S.under = under; S.ready = true; addFx(k);
     if (active === k) { active = -1; setActive(k); }   // глава уже открыта, а полотно догрузилось только сейчас: показать его
@@ -719,13 +726,13 @@ window.__krym = { get R() { return R; }, CH, L, SET };
 const pointer = { x: 0, y: 0, sx: 0, sy: 0 };
 window.addEventListener('pointermove', (e) => { pointer.x = (e.clientX / innerWidth) * 2 - 1; pointer.y = -((e.clientY / innerHeight) * 2 - 1); }, { passive: true });
 const intro = { active: false, start: 0, t: 0 };
-// настройка маяка: столб (высота/ширина у цели), кольца, ореол, ядро; из адреса, панель ползунков по ?tune=1
-const TUNE = { beam: 5.5, beamw: 0.7, rings: 0.9, halo: 0.26, core: 0.9 };
+// настройка маяка: кольца, ореол, ядро; из адреса (?rings=1.8&halo=0.3&core=0.7), панель ползунков по ?tune=1
+const TUNE = { rings: 1.8, halo: 0.3, core: 0.7 };
 { const q = new URLSearchParams(location.search); for (const key of Object.keys(TUNE)) if (q.has(key) && isFinite(+q.get(key))) TUNE[key] = +q.get(key); }
 function setupTune() {
   if (!new URLSearchParams(location.search).has('tune')) return;
   const box = document.createElement('div'); box.id = 'tune'; box.style.cssText = 'position:fixed;left:16px;top:70px;z-index:50;background:rgba(10,8,6,.82);color:#efe6d6;font:12px/1.5 Arial;padding:12px 14px;border:1px solid rgba(232,194,122,.35);width:240px;pointer-events:auto';
-  const rows = [['beam', 'столб: высота', 1, 12, 0.1], ['beamw', 'столб: ширина', 0.2, 2, 0.05], ['rings', 'кольца', 0, 3, 0.05], ['halo', 'ореол (затемнение)', 0, 0.6, 0.02], ['core', 'ядро на земле', 0, 3, 0.05]];
+  const rows = [['rings', 'кольца', 0, 3, 0.05], ['halo', 'ореол (затемнение)', 0, 0.6, 0.02], ['core', 'ядро на земле', 0, 3, 0.05]];
   const out = document.createElement('div'); out.style.cssText = 'margin-top:8px;font-family:monospace;font-size:11px;word-break:break-all;color:#e8c27a';
   const upd = () => { out.textContent = '?' + Object.keys(TUNE).map(x => x + '=' + TUNE[x]).join('&'); };
   for (const [key, label, min, max, step] of rows) { const l = document.createElement('label'); l.style.display = 'block'; const v = document.createElement('b'); v.textContent = TUNE[key]; v.style.float = 'right';
@@ -759,16 +766,17 @@ function applyTimeline(Pv, time) {
       bank = Math.sin(fly * Math.PI) * 0.055 * Math.sign(toPos[0] - fromPos[0] || 1) * (k > 0 ? 1 : 0.4);
       const tg = mix3([prev.x, prev.y, prev.z], [here.x, here.y, here.z], fly); tgt = tg;
     } else if (u < 0.75) {
-      const d = smooth((u - 0.4) / 0.35); fov = 40 + 9 * Math.sin(d * Math.PI);   // угол шире на середине падения — ощущение скорости
-      pos = mix3(toPos, camAt(k, 5), d); const arc = Math.sin(d * Math.PI) * 6.0; pos[0] += arc * Math.sign(here.x - prev.x || 1); tgt = [here.x, here.y, here.z];
-      mixv = smooth((u - 0.50) / 0.16); zoom = 1 - d;
+      const d = smooth((u - 0.4) / 0.25); fov = 40 + 14 * Math.sin(d * Math.PI);   // угол шире на середине падения — ощущение скорости
+      const dd = Math.pow(d, 1.4);   // падение к самой точке с ускорением, пока диафрагма ещё только открывается: камера входит в место
+      pos = mix3(toPos, camAt(k, 1.3), dd); const arc = Math.sin(d * Math.PI) * 6.0; pos[0] += arc * Math.sign(here.x - prev.x || 1); tgt = [here.x, here.y, here.z];
+      mixv = smooth((u - 0.52) / 0.16); zoom = 1 - d;
       // рельеф уходит в тёплую дымку цвета полотна, и из той же дымки, внахлёст, проступает полотно (без пустого экрана между ними)
-      fogv = smooth((u - 0.45) / 0.17); hazeBoost = 1 - smooth((u - 0.47) / 0.16);   // внутри открывающейся диафрагмы полотно проясняется вместе с её ростом
+      fogv = smooth((u - 0.48) / 0.17); hazeBoost = 1 - smooth((u - 0.52) / 0.16);   // внутри открывающейся диафрагмы полотно проясняется вместе с её ростом
     } else if (u < 1.65) {
-      pos = camAt(k, 5); tgt = [here.x, here.y, here.z]; mixv = 1; hold = (u - 0.75) / 0.9;
+      pos = camAt(k, 1.3); tgt = [here.x, here.y, here.z]; mixv = 1; hold = (u - 0.75) / 0.9;
     } else {
-      const d = smooth((u - 1.65) / 0.25); fov = 40 + 6 * Math.sin(d * Math.PI);
-      pos = mix3(camAt(k, 5), camAt(k, 28), d); const lean = smooth((u - 1.72) / 0.18) * 0.12; pos[0] += (next.x - here.x) * lean; pos[2] += (next.z - here.z) * lean; tgt = [here.x + (next.x - here.x) * lean * 0.5, here.y, here.z + (next.z - here.z) * lean * 0.5]; mixv = 1 - smooth((u - 1.70) / 0.13); zoom = d;
+      const d = smooth((u - 1.65) / 0.25); fov = 40 + 8 * Math.sin(d * Math.PI);
+      pos = mix3(camAt(k, 1.3), camAt(k, 28), 1 - Math.pow(1 - d, 1.7)); /* всплытие из точки с замедлением наверху */ const lean = smooth((u - 1.72) / 0.18) * 0.12; pos[0] += (next.x - here.x) * lean; pos[2] += (next.z - here.z) * lean; tgt = [here.x + (next.x - here.x) * lean * 0.5, here.y, here.z + (next.z - here.z) * lean * 0.5]; mixv = 1 - smooth((u - 1.70) / 0.13); zoom = d;
       hazeBoost = smooth((u - 1.72) / 0.18); fogv = 1 - smooth((u - 1.70) / 0.17);   // полотно остаётся видным внутри сжимающейся диафрагмы
     }
     R.uM.uFocus.value.copy(here); R.uM.uFocusR.value = 40;
@@ -785,11 +793,14 @@ function applyTimeline(Pv, time) {
     if (!S.ready) { mixv = 0; fogv = Math.max(fogv, 0.85); } else { if (S.shownAt == null) S.shownAt = time; mixv *= smooth((time - S.shownAt) / 1.2); }
     const pc = R.paintCam; const Hh = W / (S.aspect || 1.6);
     const tf = Math.tan(THREE.MathUtils.degToRad(pc.fov) / 2);
-    const D0 = Math.min((Hh / 2) / tf, (W / 2) / (tf * pc.aspect)) * 0.86;
+    const D0 = Math.min((Hh / 2) / tf, (W / 2) / (tf * pc.aspect)) * 0.86;   // вплотную: полотно закрывает экран
+    const Dfull = Math.max((Hh / 2) / tf, (W / 2) / (tf * pc.aspect)) * 1.04;   // целиком: всё полотно в кадре с полем 4 %
     const D = DIR[C.id] || DIR._; const hs = smooth(hold);
-    const dolly = lerp(D.cam[2], D.cam[5], hs) + 0.08 * (1 - smooth((uCh - 0.5) / 0.25));   // камера уже едет вперёд, пока полотно проступает из дымки
-    const ox = lerp(D.cam[0], D.cam[3], hs) * W, oy = lerp(D.cam[1], D.cam[4], hs) * W;
+    const open = smooth(hold / 0.55);   // к середине главы полотно раскрыто целиком
+    const dolly = lerp(D.cam[2] * D0, Dfull, open) / D0 + 0.08 * (1 - smooth((uCh - 0.5) / 0.25));   // сначала вплотную (камера ещё едет вперёд из дымки), потом отъезд до полного полотна
+    const ox = D.cam[0] * (1 - open) * W, oy = D.cam[1] * (1 - open) * W;
     R.uS.uFlowW.value.set(D.flowW[0], D.flowW[1]); R.uS.uFlowS.value.set(D.flowS[0], D.flowS[1]); R.uS.uWarm.value = (D.warm || 0) * hs;
+    if (D.fall) { R.uS.uFall.value.set(D.fall[0], D.fall[1], D.fall[2], D.fall[3]); R.uS.uFallV.value = D.fallV || 1; } else R.uS.uFallV.value = 0;
     const px = pointer.sx * 0.8 * br + Math.sin(time * 0.09) * 0.2 * br, py = pointer.sy * 0.45 * br + Math.sin(time * 0.07 + 1.0) * 0.12 * br;
     const land = 1 - smooth((uCh - 0.5) / 0.3);   // 1 — только вошли, 0 — сели
     pc.position.set(px + ox, py + oy + land * 1.4, D0 * dolly); pc.lookAt(px * 0.35 + ox, py * 0.35 + oy - land * 0.6, 0);
@@ -809,11 +820,11 @@ function applyTimeline(Pv, time) {
   R.uM.uLift.value = reduced ? 0 : lift;
   R.uX.uZoom.value = zoom;
   // булавки: активная глава крупнее и пульсирует
-  // булавки: ядро (в пикселях экрана) и столб света (в мировых единицах); у цели столб выше и дышит, пройденные тише
+  // булавки строго по порядку: пройденные горят тихо, цель — ядро с пульсом и кольца по земле (uBeacon), будущих не видно
+  const target = chapter >= 0 ? chapter : 0;
   const beaconK = chapter >= 0 ? (1 - mixv) : (intro.active ? (R.pins ? (R.pins.pins[0].spr.userData.lit || 0) : 0) : 1);
-  if (R.pins) R.pins.pins.forEach((p, i) => { const on = i === chapter || (chapter < 0 && i === 0); const visited = !intro.active && (Pv - 1) / L >= i - 0.6; const lit = (p.spr.userData.lit === undefined ? 1 : p.spr.userData.lit) * (intro.active || Pv < 1 ? 1 : (visited ? 1 : 0.45));
-    const rv = R.uM.uReveal.value; const pulse = 0.5 + 0.5 * Math.sin(time * 2.2); const sz = (on ? 0.026 + 0.006 * pulse : 0.016) * (0.5 + 0.5 * lit); p.spr.scale.set(sz, sz, 1); p.spr.material.opacity = (on ? 1 : 0.7) * rv * lit;
-    const bh = on ? (TUNE.beam + TUNE.beam * 0.22 * pulse) * (0.4 + 0.6 * beaconK) : TUNE.beam * 0.44; p.beam.scale.set(on ? TUNE.beamw : TUNE.beamw * 0.57, bh, 1); p.beam.material.opacity = (on ? 0.85 : 0.35) * rv * lit; p.line.material.opacity = 0.5 * lit * rv; });
+  if (R.pins) R.pins.pins.forEach((p, i) => { const on = i === target; const lit = i > target ? 0 : (i === 0 && intro.active ? (p.spr.userData.lit || 0) : 1);
+    const rv = R.uM.uReveal.value; const pulse = 0.5 + 0.5 * Math.sin(time * 2.2); const sz = on ? 0.026 + 0.006 * pulse : 0.016; p.spr.scale.set(sz, sz, 1); p.spr.material.opacity = (on ? 1 : 0.75) * rv * lit; p.line.material.opacity = 0.5 * lit * rv; });
   if (R.T) { R.T.uni.uBeacon.value = reduced ? 0 : beaconK; R.T.uni.uRingK.value = TUNE.rings; R.T.uni.uHaloK.value = TUNE.halo; R.T.uni.uCoreK.value = TUNE.core; }
   // линия маршрута видна только с высоты
   const ro = 0.45 * clamp((pos[1] - 12) / 40, 0, 1); if (R.routeMat.uniforms) { R.routeMat.uniforms.uOpacity.value = ro; if (!intro.active) { R.routeMat.uniforms.uGhost.value = 0.28; R.routeMat.uniforms.uDraw.value = clamp((Pv - 1) / L / (CH.length - 1), 0, 1); } } else R.routeMat.opacity = ro;
@@ -821,7 +832,7 @@ function applyTimeline(Pv, time) {
   const end = clamp((Pv - (1 + L * CH.length) + 0.3) / 0.6, 0, 1);
   // диафрагма нырка: полотно открывается из спроецированной точки места, из неё же бьют лучи; на выходе закрывается обратно в точку
   { const ir = R.uX.uIris.value; R.uX.uAspect.value = window.innerWidth / Math.max(1, window.innerHeight); let irR = 0, irK = 0, burst = 0;
-    if (chapter >= 0 && !reduced) { const u = uCh; if (u >= 0.40 && u < 0.75) { irR = 1.7 * smooth((u - 0.45) / 0.24); irK = 1; burst = Math.sin(clamp((u - 0.44) / 0.28, 0, 1) * Math.PI); } else if (u >= 1.65) { irR = 1.7 * (1 - smooth((u - 1.66) / 0.19)); irK = 1; burst = 0.6 * Math.sin(clamp((u - 1.66) / 0.2, 0, 1) * Math.PI); } }
+    if (chapter >= 0 && !reduced) { const u = uCh; if (u >= 0.40 && u < 0.75) { irR = 1.7 * smooth((u - 0.50) / 0.20); irK = 1; burst = Math.sin(clamp((u - 0.48) / 0.26, 0, 1) * Math.PI); } else if (u >= 1.65) { irR = 1.7 * (1 - smooth((u - 1.66) / 0.19)); irK = 1; burst = 0.6 * Math.sin(clamp((u - 1.66) / 0.2, 0, 1) * Math.PI); } }
     if (irK > 0) { const h = R.routePts[chapter]; R.mapCam.updateMatrixWorld(); const pr = R.project(h.x, h.y, h.z); const cx = clamp(pr.x, 0.1, 0.9), cy = clamp(1 - pr.y, 0.1, 0.9); ir.set(cx, cy, irR, irK); if (burst > 0.001) { R.uP.uRays.value = Math.max(R.uP.uRays.value, 0.6 * burst); R.uP.uSunUv.value.set(cx, cy); } } else ir.w = 0; }
   R.uP.uFade.value = (intro.active ? intro.t : 1) * (1 - end * 0.85);
   return { chapter, mixv, hold, fog: reduced ? 0 : fogv };
@@ -915,7 +926,7 @@ function updateHud(Pv, st) {
   const shown = []; const order = marks.map((m, k) => k); if (st.chapter >= 0) { order.splice(st.chapter, 1); order.unshift(st.chapter); }
   for (const k of order) { const m = marks[k]; const p = R.project(m.p.x, m.p.y, m.p.z); const near = st.chapter === k; const sx = p.x * innerWidth, sy = p.y * innerHeight;
     const crowded = shown.some(q => Math.abs(q[0] - sx) < 110 && Math.abs(q[1] - sy) < 34); if (!crowded) shown.push([sx, sy]);
-    const o = mapVis * (p.front ? 1 : 0) * (near ? 1 : 0.55); m.el.style.opacity = o.toFixed(3); m.el.style.left = (p.x * 100).toFixed(2) + '%'; m.el.style.top = (p.y * 100).toFixed(2) + '%'; m.el.classList.toggle('on', near); m.el.classList.toggle('dot', crowded && !near); }
+    const future = k > (st.chapter >= 0 ? st.chapter : 0); const o = mapVis * (p.front ? 1 : 0) * (near ? 1 : 0.55) * (future ? 0 : 1); m.el.style.opacity = o.toFixed(3); m.el.style.left = (p.x * 100).toFixed(2) + '%'; m.el.style.top = (p.y * 100).toFixed(2) + '%'; m.el.classList.toggle('on', near); m.el.classList.toggle('dot', crowded && !near); }
   const camY = R.mapCam.position.y; const nearK = smooth((camY - 8) / 8) * (1 - smooth((camY - 60) / 40));
   for (const sname of seas) { const p = R.project(sname.p.x, sname.p.y, sname.p.z); const isPeak = sname.el.dataset.kind === '2'; sname.el.style.opacity = (mapVis * (p.front ? 1 : 0) * (isPeak ? nearK : (document.body.classList.contains('far') ? 1 : 0))).toFixed(3); sname.el.style.left = (p.x * 100).toFixed(2) + '%'; sname.el.style.top = (p.y * 100).toFixed(2) + '%'; }
   $('#hint').classList.toggle('on', !intro.active && Pv < 0.15);
@@ -960,8 +971,9 @@ async function main() {
       return { n, a };
     } catch (e) { return makeStrokes(img, dimg, { seed: 11 + k, layers: [{ r: 0.0085, sp: 0.0075, thr: -1 }, { r: 0.0045, sp: 0.0036, thr: 0.03 }, { r: 0.0024, sp: 0.0019, thr: 0.045 }] }); }
   };
+  const NO_PEOPLE = new Set(['feodosia', 'gurzuf']);   // подлинники: вырезанные фигуры поверх оригинала двоились (головы), слой выключен
   const loadScene = async (k) => { const C = CH[k];
-    let meta = null; try { const r = await fetch('layers/' + C.id + '-people.json'); if (r.ok) meta = await r.json(); } catch (e) {}
+    let meta = null; if (!NO_PEOPLE.has(C.id)) try { const r = await fetch('layers/' + C.id + '-people.json'); if (r.ok) meta = await r.json(); } catch (e) {}
     // на плотных экранах (dpr ≥ 1.5) полотна с крупным оригиналом грузятся в 3072 px из scenes/hi/
     const hiBase = C.img.replace(/^scenes\//, '').replace(/\.[a-z]+$/, ''); const useHi = !mobile && !meta && (window.devicePixelRatio || 1) >= 1.5 && HI_SCENES.has(hiBase);
     const [img, dimg] = await Promise.all([loadImage(meta ? 'layers/' + C.id + '-clean.jpg' : (useHi ? 'scenes/hi/' + hiBase + '.jpg' : C.img), mobile ? 1400 : (useHi ? 3072 : 2048)), loadImage(C.depth, 1024)]); const strokes = await loadStrokes(k, img, dimg); R.addScene(k, img, dimg, strokes);
