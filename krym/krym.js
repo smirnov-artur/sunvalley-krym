@@ -827,7 +827,7 @@ function applyTimeline(Pv, time) {
     const rv = R.uM.uReveal.value; const pulse = 0.5 + 0.5 * Math.sin(time * 2.2); const sz = on ? 0.026 + 0.006 * pulse : 0.016; p.spr.scale.set(sz, sz, 1); p.spr.material.opacity = (on ? 1 : 0.75) * rv * lit; p.line.material.opacity = 0.5 * lit * rv; });
   if (R.T) { R.T.uni.uBeacon.value = reduced ? 0 : beaconK; R.T.uni.uRingK.value = TUNE.rings; R.T.uni.uHaloK.value = TUNE.halo; R.T.uni.uCoreK.value = TUNE.core; }
   // линия маршрута видна только с высоты
-  const ro = 0.45 * clamp((pos[1] - 12) / 40, 0, 1); if (R.routeMat.uniforms) { R.routeMat.uniforms.uOpacity.value = ro; if (!intro.active) { R.routeMat.uniforms.uGhost.value = 0.28; R.routeMat.uniforms.uDraw.value = clamp((Pv - 1) / L / (CH.length - 1), 0, 1); } } else R.routeMat.opacity = ro;
+  const ro = 0.45 * clamp((pos[1] - 12) / 40, 0, 1); if (R.routeMat.uniforms) { R.routeMat.uniforms.uOpacity.value = ro; if (!intro.active) { R.routeMat.uniforms.uGhost.value = 0.14; R.routeMat.uniforms.uDraw.value = clamp((Pv - 1) / L / (CH.length - 1), 0, 1); } } else R.routeMat.opacity = ro;
   document.body.classList.toggle('far', pos[1] > 120);
   const end = clamp((Pv - (1 + L * CH.length) + 0.3) / 0.6, 0, 1);
   // диафрагма нырка: полотно открывается из спроецированной точки места, из неё же бьют лучи; на выходе закрывается обратно в точку
@@ -1006,8 +1006,9 @@ function sunrise(ti) {
   R.skyDawn.value = (1 - smooth((el - 2) / 12)) * smooth((el + 4) / 5);
   if (intro.active) R.uP.uRays.value = reduced ? 0 : R.skyDawn.value * 0.9;
   { const sd = R.T.uni.uSun.value; const v = new THREE.Vector3(R.mapCam.position.x + sd.x * 400, R.mapCam.position.y + sd.y * 400, R.mapCam.position.z + sd.z * 400).project(R.mapCam); R.uP.uSunUv.value.set(clamp(v.x * 0.5 + 0.5, -0.3, 1.3), clamp(v.y * 0.5 + 0.5, -0.3, 1.3)); }
-  const rm = R.routeMat.uniforms; const dr = smooth((ti - 2.4) / 3.6); if (rm) rm.uDraw.value = dr;
-  if (R.comet && R.route.userData.pts) { const pts = R.route.userData.pts; const p = pts[Math.min(pts.length - 1, Math.floor(dr * (pts.length - 1)))]; R.comet.position.copy(p); R.comet.material.opacity = 0.9 * smoothstep01(dr, 0.01, 0.06) * (1 - smoothstep01(dr, 0.94, 1.0)); }
+  // на восходе дорога вперёд не прочерчивается и комета по ней не бегает (точки зажигаются по порядку, по ходу истории); лишь едва заметный призрак пути
+  const rm = R.routeMat.uniforms; const dr = smooth((ti - 2.4) / 3.6); if (rm) { rm.uDraw.value = 0; rm.uGhost.value = 0.14 * dr; }
+  if (R.comet) R.comet.material.opacity = 0;
   if (R.pins) R.pins.pins.forEach((p, i) => { p.userData = p.userData || {}; p.spr.userData.lit = smooth((ti - 3.0 - i * 0.2) / 0.7); });
   introCam = 1 - smooth(ti / 7.5);
   if (ti > 4.2) document.body.classList.add('title');
