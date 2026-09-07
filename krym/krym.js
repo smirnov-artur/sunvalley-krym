@@ -794,7 +794,8 @@ function applyTimeline(Pv, time) {
     const pc = R.paintCam; const Hh = W / (S.aspect || 1.6);
     const tf = Math.tan(THREE.MathUtils.degToRad(pc.fov) / 2);
     const D0 = Math.min((Hh / 2) / tf, (W / 2) / (tf * pc.aspect)) * 0.86;   // вплотную: полотно закрывает экран
-    const Dfull = Math.max((Hh / 2) / tf, (W / 2) / (tf * pc.aspect)) * 1.04;   // целиком: всё полотно в кадре с полем 4 %
+    let Dfull = Math.max((Hh / 2) / tf, (W / 2) / (tf * pc.aspect)) * 1.04;   // целиком: всё полотно в кадре с полем 4 %
+    if (pc.aspect < 1) Dfull = Math.min(Dfull, D0 * 1.18);   // на вертикальном экране целиком не влезает без полоски — отъезд лишь небольшой
     const D = DIR[C.id] || DIR._; const hs = smooth(hold);
     const open = smooth(hold / 0.55);   // к середине главы полотно раскрыто целиком
     const dolly = lerp(D.cam[2] * D0, Dfull, open) / D0 + 0.08 * (1 - smooth((uCh - 0.5) / 0.25));   // сначала вплотную (камера ещё едет вперёд из дымки), потом отъезд до полного полотна
@@ -835,7 +836,7 @@ function applyTimeline(Pv, time) {
     if (chapter >= 0 && !reduced) { const u = uCh; if (u >= 0.40 && u < 0.75) { irR = 1.7 * smooth((u - 0.50) / 0.20); irK = 1; burst = Math.sin(clamp((u - 0.48) / 0.26, 0, 1) * Math.PI); } else if (u >= 1.65) { irR = 1.7 * (1 - smooth((u - 1.66) / 0.19)); irK = 1; burst = 0.6 * Math.sin(clamp((u - 1.66) / 0.2, 0, 1) * Math.PI); } }
     if (irK > 0) { const h = R.routePts[chapter]; R.mapCam.updateMatrixWorld(); const pr = R.project(h.x, h.y, h.z); const cx = clamp(pr.x, 0.1, 0.9), cy = clamp(1 - pr.y, 0.1, 0.9); ir.set(cx, cy, irR, irK); if (burst > 0.001) { R.uP.uRays.value = Math.max(R.uP.uRays.value, 0.6 * burst); R.uP.uSunUv.value.set(cx, cy); } } else ir.w = 0; }
   R.uP.uFade.value = (intro.active ? intro.t : 1) * (1 - end * 0.85);
-  return { chapter, mixv, hold, fog: reduced ? 0 : fogv };
+  return { chapter, mixv, hold, fog: reduced ? 0 : fogv, u: uCh };
 }
 
 // ---------- DOM ----------
@@ -913,11 +914,16 @@ function updateHud(Pv, st) {
   const heroO = 1 - smooth((Pv - 0.2) / 0.4);
   const hero = $('.s-hero'); hero.style.opacity = heroO.toFixed(3); hero.style.visibility = heroO < 0.01 ? 'hidden' : 'visible';
   const ch = $('#chapter');
-  if (st.chapter >= 0) {
-    const C = CH[st.chapter];
-    if (ch.dataset.k != st.chapter) { ch.dataset.k = st.chapter; ch.classList.toggle('light', (R.scenes[st.chapter].lum || 0) > 0.55); document.body.classList.toggle('lightch', (R.scenes[st.chapter].lum || 0) > 0.5); $('#chYear').textContent = C.year + ' · ' + C.place; const big = $('#chBig'); if (big) { big.textContent = /^\d{4}$/.test(C.year) ? C.year : ''; }
+  // подлёт к первой точке (ещё до главы 0): её год, место и название уже читаются в блоке
+  const kk = st.chapter >= 0 ? st.chapter : (Pv > 0.45 ? 0 : -1);
+  if (kk >= 0) {
+    const C = CH[kk];
+    if (ch.dataset.k != kk) { ch.dataset.k = kk; ch.classList.toggle('light', (R.scenes[kk].lum || 0) > 0.55); document.body.classList.toggle('lightch', (R.scenes[kk].lum || 0) > 0.5); $('#chYear').textContent = C.year + ' · ' + C.place; const big = $('#chBig'); if (big) { big.textContent = /^\d{4}$/.test(C.year) ? C.year : ''; }
       $('#chTitle').innerHTML = C.title.split(' ').map((w, i) => `<span style="--i:${i}">${w}</span>`).join(' '); ch.classList.remove('in'); void ch.offsetWidth; $('#chPainter').textContent = C.painter + (C.pyear && C.pyear < 2026 ? ', ' + C.pyear : ''); $('#chText').textContent = C.text; }
-    const o = smooth((st.hold - 0.05) / 0.25) * (1 - smooth((st.hold - 0.85) / 0.15)) * (st.mixv > 0.5 ? 1 : 0);
+    // куда летим — читается уже в перелёте (год, место, название на подложке), художник и текст добавляются на полотне
+    const u = st.u || 0; const flyK = st.chapter >= 0 ? smooth((u - 0.06) / 0.14) * (1 - smooth((u - 0.50) / 0.12)) : smooth((Pv - 0.5) / 0.2);
+    const holdK = smooth((st.hold - 0.05) / 0.25) * (1 - smooth((st.hold - 0.85) / 0.15)) * (st.mixv > 0.5 ? 1 : 0);
+    const o = Math.max(flyK, holdK); ch.classList.toggle('fly', flyK > holdK);
     ch.style.opacity = o.toFixed(3); ch.style.visibility = o < 0.01 ? 'hidden' : 'visible'; ch.style.transform = `translateY(${((1 - o) * 24).toFixed(1)}px)`; ch.classList.toggle('in', o > 0.02);
   } else { ch.style.opacity = 0; ch.style.visibility = 'hidden'; }
   // метки на карте
@@ -925,8 +931,8 @@ function updateHud(Pv, st) {
   // сначала текущая глава, потом по порядку; подпись прячется, если ближе 64 px к уже показанной (точка остаётся)
   const shown = []; const order = marks.map((m, k) => k); if (st.chapter >= 0) { order.splice(st.chapter, 1); order.unshift(st.chapter); }
   for (const k of order) { const m = marks[k]; const p = R.project(m.p.x, m.p.y, m.p.z); const near = st.chapter === k; const sx = p.x * innerWidth, sy = p.y * innerHeight;
-    const crowded = shown.some(q => Math.abs(q[0] - sx) < 110 && Math.abs(q[1] - sy) < 34); if (!crowded) shown.push([sx, sy]);
-    const future = k > (st.chapter >= 0 ? st.chapter : 0); const o = mapVis * (p.front ? 1 : 0) * (near ? 1 : 0.55) * (future ? 0 : 1); m.el.style.opacity = o.toFixed(3); m.el.style.left = (p.x * 100).toFixed(2) + '%'; m.el.style.top = (p.y * 100).toFixed(2) + '%'; m.el.classList.toggle('on', near); m.el.classList.toggle('dot', crowded && !near); }
+    const crowded = shown.some(q => Math.abs(q[0] - sx) < 180 && Math.abs(q[1] - sy) < 48); if (!crowded) shown.push([sx, sy]);
+    const future = k > (st.chapter >= 0 ? st.chapter : 0); const o = mapVis * (p.front ? 1 : 0) * (near ? 1 : 0.4) * (future ? 0 : 1); m.el.style.opacity = o.toFixed(3); m.el.style.left = (p.x * 100).toFixed(2) + '%'; m.el.style.top = (p.y * 100).toFixed(2) + '%'; m.el.classList.toggle('on', near); m.el.classList.toggle('dot', crowded && !near); }
   const camY = R.mapCam.position.y; const nearK = smooth((camY - 8) / 8) * (1 - smooth((camY - 60) / 40));
   for (const sname of seas) { const p = R.project(sname.p.x, sname.p.y, sname.p.z); const isPeak = sname.el.dataset.kind === '2'; sname.el.style.opacity = (mapVis * (p.front ? 1 : 0) * (isPeak ? nearK : (document.body.classList.contains('far') ? 1 : 0))).toFixed(3); sname.el.style.left = (p.x * 100).toFixed(2) + '%'; sname.el.style.top = (p.y * 100).toFixed(2) + '%'; }
   $('#hint').classList.toggle('on', !intro.active && Pv < 0.15);
