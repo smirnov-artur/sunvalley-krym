@@ -197,7 +197,9 @@ function grid(wKm, hKm, sx, sy, uvRect) {
 
 export async function createTerrain({ meta, noiseTex, mobile }) {
   const wKm = W10 * KM10, hKm = H10 * KM10;
-  const base = await loadPacked('data/hgt-base.png');
+  // первый кадр — с облегчённой базы (896×576, ~220 КБ), полная (1792×1152, ~2.9 МБ) грузится следом и подменяется на лету
+  let base; try { base = await loadPacked('data/hgt-lite.png'); } catch (e) { base = await loadPacked('data/hgt-base.png'); }
+  const liteBase = base.w < 1500;
   const uvOf = (lon, lat) => [(lon - meta.lonW) / (meta.lonE - meta.lonW), (mercY(lat) - mercY(meta.latN)) / (mercY(meta.latS) - mercY(meta.latN))];
   const patches = [];
   const loadPatch = async (name) => { const m = await (await fetch('data/' + name + '.json')).json(); const t = await loadPacked('data/' + name + '.png'); const a = uvOf(m.lonW, m.latN), b = uvOf(m.lonE, m.latS); return { name, tex: t, rect: [a[0], a[1], b[0], b[1]], kmPx: m.kmPerPx, w: t.w, h: t.h }; };
@@ -210,11 +212,17 @@ export async function createTerrain({ meta, noiseTex, mobile }) {
   const group = new THREE.Group();
   const landMat = (isPatch, tex, texel, kmPx) => new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: LAND_VERT, fragmentShader: LAND_FRAG, uniforms: { ...uni, ...shared, uHgt: { value: tex.tex }, uShore: { value: base.shore }, uIsPatch: { value: isPatch ? 1 : 0 }, uTexel: { value: new THREE.Vector2(...texel) }, uKmPx: { value: kmPx }, uTexelP: { value: new THREE.Vector2() }, uKmPxP: { value: 0 }, uMyRect: { value: new THREE.Vector4(0, 0, 1, 1) } }, side: THREE.DoubleSide });
   const segB = mobile ? [448, 288] : [896, 576];
-  const land = new THREE.Mesh(grid(wKm, hKm, segB[0], segB[1]), landMat(false, base, [1 / base.w, 1 / base.h], 0.216)); land.frustumCulled = false; land.renderOrder = 0; group.add(land);
+  const land = new THREE.Mesh(grid(wKm, hKm, segB[0], segB[1]), landMat(false, base, [1 / base.w, 1 / base.h], liteBase ? 0.432 : 0.216)); land.frustumCulled = false; land.renderOrder = 0; group.add(land);
   const addPatch = (p) => { patches.push(p); const segs = [Math.round(p.w / 2), Math.round(p.h / 2)]; const m = new THREE.Mesh(grid(wKm, hKm, segs[0], segs[1], p.rect), landMat(true, p.tex, [1 / p.w, 1 / p.h], p.kmPx)); m.material.uniforms.uMyRect.value.set(...p.rect); m.frustumCulled = false; m.renderOrder = 0; group.add(m);
     const key = p.name === 'hgt-east' ? 'E' : 'S'; shared['uHgt' + key].value = p.tex.tex; shared['uPatch' + key].value.set(...p.rect); shared.uHasPatch.value = 1; };
-  const ready = (mobile ? ['hgt-east'] : ['hgt-east', 'hgt-south']).reduce((pr, name) => pr.then(() => loadPatch(name).then(addPatch).catch((e) => console.warn('[terrain] нет патча', name))), Promise.resolve());
   const sea = new THREE.Mesh(grid(wKm, hKm, 2, 2), new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: SEA_VERT, fragmentShader: SEA_FRAG, uniforms: { ...uni, uHgt: { value: base.tex }, uShore: { value: base.shore } }, side: THREE.DoubleSide }));
+  // подмена облегчённой базы полной: те же сетки, только текстуры высот и берега (и шаг текселя для нормалей); патчи — после неё
+  const swapBase = async () => {
+    if (!liteBase) return; const full = await loadPacked('data/hgt-base.png');
+    for (const m of [land, sea]) { const u = m.material.uniforms; u.uHgt.value = full.tex; u.uShore.value = full.shore; if (u.uTexel) u.uTexel.value.set(1 / full.w, 1 / full.h); if (u.uKmPx) u.uKmPx.value = 0.216; }
+    Object.assign(base, { tex: full.tex, shore: full.shore, w: full.w, h: full.h, hgt: full.hgt });
+  };
+  const ready = (mobile ? ['hgt-east'] : ['hgt-east', 'hgt-south']).reduce((pr, name) => pr.then(() => loadPatch(name).then(addPatch).catch((e) => console.warn('[terrain] нет патча', name))), swapBase().catch((e) => console.warn('[terrain] полная база', e)));
   sea.position.y = -0.012; sea.frustumCulled = false; sea.renderOrder = -1; group.add(sea);
   // облака: редкие, над горами, тень под ними уже лежит на земле
   const clouds = new THREE.Mesh(grid(wKm, hKm, 2, 2), new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: CLOUD_VERT, fragmentShader: CLOUD_FRAG, uniforms: { uNoise: uni.uNoise, uTime: uni.uTime, uCam: uni.uCam, uSunCol: uni.uSunCol, uSunI: uni.uSunI, uAmb: uni.uAmb, uFog: uni.uFog, uReveal: uni.uReveal }, transparent: true, depthWrite: false, depthTest: true, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor, side: THREE.DoubleSide }));
