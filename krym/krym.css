@@ -123,3 +123,24 @@ body.far .mark b { font-size: 13px; }
 .sea.city { color: rgba(239,230,214,.8); }
 /* в перелёте блок главы показывает только год, место и название */
 .s-chapter.fly .painter, .s-chapter.fly p:last-child { opacity: 0 !important; transform: translateY(12px) !important; }
+
+/* пролог: ворота с солнцем, две створки разъезжаются, за ними встаёт солнце над Крымом */
+#prologue { position: fixed; inset: 0; z-index: 38; overflow: hidden; background: transparent; }   /* фона нет: створки закрывают экран сами, а при открытии за ними сразу карта */
+#prologue[hidden] { display: none; }
+#prologue .leaf { position: absolute; top: 0; bottom: 0; width: 50%; overflow: hidden; transition: transform 1.8s cubic-bezier(.65,.02,.25,1) .45s; will-change: transform; }
+#prologue .leaf.l { left: 0; } #prologue .leaf.r { right: 0; }
+#prologue .leaf img { position: absolute; top: 0; width: 100vw; height: 100%; object-fit: cover; object-position: 38% 45%; transform: scale(1.06); transition: transform 9s ease-out; }
+#prologue .leaf.l img { left: 0; } #prologue .leaf.r img { right: 0; }
+#prologue.in .leaf img { transform: scale(1.0); }
+#prologue.open .leaf.l { transform: translateX(-103%); } #prologue.open .leaf.r { transform: translateX(103%); }
+#prologue .veil { position: absolute; inset: 0; background: linear-gradient(to top, rgba(8,6,4,.9) 0%, rgba(8,6,4,.55) 32%, rgba(8,6,4,.12) 62%, rgba(8,6,4,.35) 100%); transition: opacity .9s ease; }
+#prologue .box { position: absolute; left: 40px; bottom: 84px; max-width: 760px; opacity: 0; transform: translateY(18px); transition: opacity 1.4s ease .4s, transform 1.4s cubic-bezier(.2,.7,.2,1) .4s; }
+#prologue.in .box { opacity: 1; transform: none; }
+#prologue .box h1 { font-family: var(--serif); font-weight: 300; font-size: clamp(40px, 5.6vw, 92px); line-height: 1.0; margin: 0; color: var(--paper); text-shadow: 0 1px 2px rgba(0,0,0,.5), 0 0 30px rgba(0,0,0,.4); text-wrap: balance; }
+#prologue .box h1 em { font-style: italic; color: var(--gold-hi); }
+#prologue .box p { font-size: 15px; line-height: 1.65; color: rgba(239,230,214,.86); max-width: 560px; margin: 22px 0 0; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+#prologue .box .eyebrow { text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+#prologue .row { display: flex; align-items: center; gap: 22px; margin-top: 30px; }
+#prologue .or { font-size: 11px; letter-spacing: .24em; text-transform: uppercase; color: rgba(239,230,214,.55); }
+#prologue.open .box, #prologue.open .veil { opacity: 0; transition: opacity .6s ease; }
+@media (max-width: 900px) { #prologue .box { left: 20px; right: 20px; bottom: 70px; } #prologue .box p { font-size: 14px; } #prologue .row { flex-wrap: wrap; gap: 12px; } }

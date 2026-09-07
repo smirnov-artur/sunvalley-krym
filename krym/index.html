@@ -13,7 +13,7 @@
 <link rel="modulepreload" href="../assets/vendor/three/three.core.min.js">
 <link rel="modulepreload" href="krym.js"><link rel="modulepreload" href="terrain.js"><link rel="modulepreload" href="../zhivopis/paint.js"><link rel="modulepreload" href="../iz-nichego/world.js">
 <link rel="preload" as="fetch" href="data/dem-crimea-lite.json" crossorigin><link rel="preload" as="image" href="data/dem-crimea-lite.png">
-<link rel="preload" as="image" href="data/hgt-lite.png">
+<link rel="preload" as="image" href="data/hgt-lite.png"><link rel="preload" as="image" href="now/gate.jpg">
 <link rel="preload" as="image" href="scenes/bossoli-sudak.jpg"><link rel="preload" as="image" href="depth/bossoli-sudak-depth.png">
 </head>
 <body>
@@ -23,7 +23,7 @@
 <div id="loader">
   <div class="mark">Солнечная Долина</div>
   <div class="bar"><i></i></div>
-  <div class="cap">Крым, написанный великими</div>
+  <div class="cap">Винодельня в Крыму · с 1888 года</div>
 </div>
 
 <div id="gate" hidden>
@@ -37,6 +37,19 @@
   </div>
 </div>
 
+<!-- пролог: ворота Архадерессе с солнцем (реальное фото 21.08.2026) — кто мы и что впереди; открываются по кнопке или колесу -->
+<section id="prologue" hidden>
+  <div class="leaf l"><img src="now/gate.jpg" alt="Ворота Архадерессе с солнцем"></div>
+  <div class="leaf r"><img src="now/gate.jpg" alt=""></div>
+  <div class="veil"></div>
+  <div class="box">
+    <p class="eyebrow">Солнечная Долина · Архадерессе · 1888</p>
+    <h1>Винодельня,<br>которую <em>писали великие.</em></h1>
+    <p>У Судака, между Меганомом и Козами, с 1888 года делают вино. Этот берег писали Айвазовский, Куинджи, Коровин и Богаевский. За воротами — карта Крыма и дорога по их полотнам, век за веком, к нашей долине.</p>
+    <div class="row"><button class="btn" id="prologueOpen">Открыть ворота</button><span class="or">или листайте</span></div>
+  </div>
+</section>
+
 <header class="top" id="top">
   <a class="wordmark" href="#"><span>Солнечная Долина</span><small>Архадерессе · 1888</small></a>
   <nav class="nav">
@@ -45,16 +58,14 @@
     <a href="#">Экскурсии</a>
     <a href="#">Контакты</a>
     <a class="set" id="setLink" href="originals.html" title="Та же дорога только по полотнам мастеров и фотографиям">Только оригиналы</a>
-    <button class="sound" id="soundBtn" type="button" aria-pressed="false">Звук</button>
-    <button class="sound music" id="musicBtn" type="button" aria-pressed="false" hidden>Музыка</button>
   </nav>
 </header>
 
 <div id="hud">
   <section class="stop s-hero">
-    <p class="eyebrow">Крым, написанный великими</p>
+    <p class="eyebrow">Винодельня «Солнечная Долина» · Крым, с 1888 года</p>
     <h1>Дорога к одной<br><em>долине.</em></h1>
-    <p>Айвазовский, Куинджи, Коровин, Богаевский писали этот берег. Их полотна стоят на своих местах, и по ним, век за веком, дорога приводит в Солнечную Долину.</p>
+    <p>Здесь, у Судака, с 1888 года делают вино. Айвазовский, Куинджи, Коровин, Богаевский писали этот берег, и по их полотнам, век за веком, дорога приводит в Солнечную Долину.</p>
   </section>
 
   <section class="stop s-chapter" id="chapter">

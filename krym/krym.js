@@ -353,7 +353,7 @@ const BIRD_FRAG = /* glsl */`precision highp float; in float vA; uniform float u
 
 const FS_VERT = /* glsl */`precision highp float; in vec3 position; in vec2 uv; out vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }`;
 const MIX_FRAG = /* glsl */`precision highp float; in vec2 vUv; out vec4 outColor; uniform sampler2D uA; uniform sampler2D uB; uniform float uMix; uniform float uZoom; uniform float uFog; uniform vec3 uFogCol; uniform sampler2D uNoise; uniform float uTime; uniform vec4 uIris; uniform float uAspect;
-void main(){ vec2 uvB = (vUv - 0.5) * (1.0 + (1.0 - uMix) * 0.10 * uZoom) + 0.5; vec2 uvA = mix(vUv, uIris.xy + (vUv - uIris.xy) * (1.0 - 0.12 * clamp(uIris.z / 1.7, 0.0, 1.0)), uIris.w); vec3 a = texture(uA, uvA).rgb;   // карта чуть наплывает вокруг точки, пока диафрагма растёт — падение в точку
+void main(){ vec2 uvB = (vUv - 0.5) * (1.0 + (1.0 - uMix) * 0.10 * uZoom) + 0.5; vec2 uvA = mix(vUv, uIris.xy + (vUv - uIris.xy) * (1.0 - 0.30 * clamp(uIris.z / 1.7, 0.0, 1.0)), uIris.w); vec3 a = texture(uA, uvA).rgb;   // карта чуть наплывает вокруг точки, пока диафрагма растёт — падение в точку
   // дымка клочьями: плотность и граница смешения гуляют по шуму, экран не становится ровным листом
   float n = texture(uNoise, vUv * vec2(1.6, 1.0) + vec2(uTime * 0.012, uTime * 0.004)).r + 0.5 * texture(uNoise, vUv * vec2(3.2, 2.0) - vec2(uTime * 0.02, 0.0)).g;
   float mist = clamp(uFog * (0.72 + 0.4 * (n - 0.75)), 0.0, 1.0); a = mix(a, uFogCol * (0.9 + 0.2 * vUv.y), mist);
@@ -729,17 +729,7 @@ const intro = { active: false, start: 0, t: 0 };
 // настройка маяка: кольца, ореол, ядро; из адреса (?rings=1.8&halo=0.3&core=0.7), панель ползунков по ?tune=1
 const TUNE = { rings: 1.8, halo: 0.3, core: 0.7 };
 { const q = new URLSearchParams(location.search); for (const key of Object.keys(TUNE)) if (q.has(key) && isFinite(+q.get(key))) TUNE[key] = +q.get(key); }
-function setupTune() {
-  if (!new URLSearchParams(location.search).has('tune')) return;
-  const box = document.createElement('div'); box.id = 'tune'; box.style.cssText = 'position:fixed;left:16px;top:70px;z-index:50;background:rgba(10,8,6,.82);color:#efe6d6;font:12px/1.5 Arial;padding:12px 14px;border:1px solid rgba(232,194,122,.35);width:240px;pointer-events:auto';
-  const rows = [['rings', 'кольца', 0, 3, 0.05], ['halo', 'ореол (затемнение)', 0, 0.6, 0.02], ['core', 'ядро на земле', 0, 3, 0.05]];
-  const out = document.createElement('div'); out.style.cssText = 'margin-top:8px;font-family:monospace;font-size:11px;word-break:break-all;color:#e8c27a';
-  const upd = () => { out.textContent = '?' + Object.keys(TUNE).map(x => x + '=' + TUNE[x]).join('&'); };
-  for (const [key, label, min, max, step] of rows) { const l = document.createElement('label'); l.style.display = 'block'; const v = document.createElement('b'); v.textContent = TUNE[key]; v.style.float = 'right';
-    const r = document.createElement('input'); r.type = 'range'; r.min = min; r.max = max; r.step = step; r.value = TUNE[key]; r.style.width = '100%'; r.oninput = () => { TUNE[key] = +r.value; v.textContent = r.value; upd(); };
-    l.append(label, v, r); box.appendChild(l); }
-  box.appendChild(out); upd(); document.body.appendChild(box);
-}
+// панель ползунков убрана по просьбе Артура; параметры маяка остаются в адресе (?rings=&halo=&core=)
 const OVER = mobile ? { pos: [15, 520, 250], tgt: [15, 0, 25], fov: 50 } : { pos: [-50, 205, 205], tgt: [-68, 0, 12], fov: 40 };   // на телефоне обзор выше и шире, чтобы полуостров влез в портрет
 
 function camAt(k, alt) { const p = R.routePts[k]; return [p.x, p.y + alt, p.z + alt * 0.55]; }
@@ -766,17 +756,17 @@ function applyTimeline(Pv, time) {
       bank = Math.sin(fly * Math.PI) * 0.055 * Math.sign(toPos[0] - fromPos[0] || 1) * (k > 0 ? 1 : 0.4);
       const tg = mix3([prev.x, prev.y, prev.z], [here.x, here.y, here.z], fly); tgt = tg;
     } else if (u < 0.75) {
-      const d = smooth((u - 0.4) / 0.25); fov = 40 + 14 * Math.sin(d * Math.PI);   // угол шире на середине падения — ощущение скорости
+      const d = smooth((u - 0.4) / 0.25); fov = 40 + 12 * Math.sin(d * Math.PI) - 12 * d;   // шире на середине падения, к концу уже: зум в саму точку
       const dd = Math.pow(d, 1.4);   // падение к самой точке с ускорением, пока диафрагма ещё только открывается: камера входит в место
-      pos = mix3(toPos, camAt(k, 1.3), dd); const arc = Math.sin(d * Math.PI) * 6.0; pos[0] += arc * Math.sign(here.x - prev.x || 1); tgt = [here.x, here.y, here.z];
+      pos = mix3(toPos, camAt(k, 0.5), dd); const arc = Math.sin(d * Math.PI) * 6.0; pos[0] += arc * Math.sign(here.x - prev.x || 1); tgt = [here.x, here.y, here.z];
       mixv = smooth((u - 0.52) / 0.16); zoom = 1 - d;
       // рельеф уходит в тёплую дымку цвета полотна, и из той же дымки, внахлёст, проступает полотно (без пустого экрана между ними)
       fogv = smooth((u - 0.48) / 0.17); hazeBoost = 1 - smooth((u - 0.52) / 0.16);   // внутри открывающейся диафрагмы полотно проясняется вместе с её ростом
     } else if (u < 1.65) {
-      pos = camAt(k, 1.3); tgt = [here.x, here.y, here.z]; mixv = 1; hold = (u - 0.75) / 0.9;
+      pos = camAt(k, 0.5); tgt = [here.x, here.y, here.z]; mixv = 1; hold = (u - 0.75) / 0.9;
     } else {
       const d = smooth((u - 1.65) / 0.25); fov = 40 + 8 * Math.sin(d * Math.PI);
-      pos = mix3(camAt(k, 1.3), camAt(k, 28), 1 - Math.pow(1 - d, 1.7)); /* всплытие из точки с замедлением наверху */ const lean = smooth((u - 1.72) / 0.18) * 0.12; pos[0] += (next.x - here.x) * lean; pos[2] += (next.z - here.z) * lean; tgt = [here.x + (next.x - here.x) * lean * 0.5, here.y, here.z + (next.z - here.z) * lean * 0.5]; mixv = 1 - smooth((u - 1.70) / 0.13); zoom = d;
+      pos = mix3(camAt(k, 0.5), camAt(k, 28), 1 - Math.pow(1 - d, 1.7)); hold = 1 + (u - 1.65) / 0.25; /* всплытие из точки с замедлением наверху */ const lean = smooth((u - 1.72) / 0.18) * 0.12; pos[0] += (next.x - here.x) * lean; pos[2] += (next.z - here.z) * lean; tgt = [here.x + (next.x - here.x) * lean * 0.5, here.y, here.z + (next.z - here.z) * lean * 0.5]; mixv = 1 - smooth((u - 1.70) / 0.13); zoom = d;
       hazeBoost = smooth((u - 1.72) / 0.18); fogv = 1 - smooth((u - 1.70) / 0.17);   // полотно остаётся видным внутри сжимающейся диафрагмы
     }
     R.uM.uFocus.value.copy(here); R.uM.uFocusR.value = 40;
@@ -922,7 +912,7 @@ function updateHud(Pv, st) {
       $('#chTitle').innerHTML = C.title.split(' ').map((w, i) => `<span style="--i:${i}">${w}</span>`).join(' '); ch.classList.remove('in'); void ch.offsetWidth; $('#chPainter').textContent = C.painter + (C.pyear && C.pyear < 2026 ? ', ' + C.pyear : ''); $('#chText').textContent = C.text; }
     // куда летим — читается уже в перелёте (год, место, название на подложке), художник и текст добавляются на полотне
     const u = st.u || 0; const flyK = st.chapter >= 0 ? smooth((u - 0.06) / 0.14) * (1 - smooth((u - 0.50) / 0.12)) : smooth((Pv - 0.5) / 0.2);
-    const holdK = smooth((st.hold - 0.05) / 0.25) * (1 - smooth((st.hold - 0.85) / 0.15)) * (st.mixv > 0.5 ? 1 : 0);
+    const holdK = smooth((st.hold - 0.05) / 0.25) * (1 - smooth((st.hold - 1.0) / 0.1)) * (st.mixv > 0.5 || st.hold >= 1 ? 1 : 0);
     const o = Math.max(flyK, holdK); ch.classList.toggle('fly', flyK > holdK);
     ch.style.opacity = o.toFixed(3); ch.style.visibility = o < 0.01 ? 'hidden' : 'visible'; ch.style.transform = `translateY(${((1 - o) * 24).toFixed(1)}px)`; ch.classList.toggle('in', o > 0.02);
   } else { ch.style.opacity = 0; ch.style.visibility = 'hidden'; }
@@ -965,7 +955,7 @@ async function main() {
   setP(0.6); lap('map');
   R = createRenderer($('#gl'), map, T);
   setupMarks(); setupScroll(); fillCredits(); loadNow();
-  const sb = $('#soundBtn'); if (sb) sb.addEventListener('click', toggleSound); setupMusic(); setupTune();
+  const sb = $('#soundBtn'); if (sb) sb.addEventListener('click', toggleSound); setupMusic();
   // первая картина — до старта, остальные — фоном
   // мазки: из запечённого файла (tools/krym/bake.js), иначе считаем в браузере
   const loadStrokes = async (k, img, dimg) => {
@@ -996,9 +986,23 @@ async function main() {
   const gate = $('#gate');
   const ok = qs.get('gate') === '0' || localStorage.getItem('sd-18') === '1';
   loader.classList.add('out');
-  if (!ok) { gate.hidden = false; $('#gateYes').addEventListener('click', () => { try { localStorage.setItem('sd-18', '1'); } catch (e) {} gate.classList.add('out'); start(); }); }
-  else { gate.hidden = true; start(); }
+  // пролог (ворота) показывается всегда, кроме тестового режима gate=0; prologue=1 включает его и в тестах
+  const withPrologue = qs.get('prologue') === '1' || (qs.get('gate') !== '0' && qs.get('prologue') !== '0');
+  const go = () => { if (withPrologue && $('#prologue')) openPrologue(); else start(); };
+  if (!ok) { gate.hidden = false; $('#gateYes').addEventListener('click', () => { try { localStorage.setItem('sd-18', '1'); } catch (e) {} gate.classList.add('out'); go(); }); }
+  else { gate.hidden = true; go(); }
   (async () => { for (let k = 1; k < CH.length; k++) { await new Promise(r => setTimeout(r, 300)); await loadScene(k); lap('scene ' + k); } })();
+}
+// пролог: ворота Архадерессе закрыты, прокрутка заперта; по кнопке, колесу, свайпу или клавише створки разъезжаются и начинается восход
+function openPrologue() {
+  const pr = $('#prologue'); pr.hidden = false; requestAnimationFrame(() => pr.classList.add('in'));
+  if (lenis) lenis.stop(); document.documentElement.style.overflow = 'hidden'; window.scrollTo(0, 0);
+  let opened = false;
+  const open = () => { if (opened) return; opened = true; pr.classList.add('open'); document.documentElement.style.overflow = ''; if (lenis) lenis.start(); window.scrollTo(0, 0);
+    start(); intro.start -= 900; setTimeout(() => { pr.hidden = true; }, 2500); };   // восход стартует с опережением 0.9 с: когда створки трогаются, за ними уже светает, а не чёрная пустота
+  $('#prologueOpen').addEventListener('click', open);
+  window.addEventListener('wheel', open, { passive: true, once: true }); window.addEventListener('touchmove', open, { passive: true, once: true });
+  window.addEventListener('keydown', (e) => { if (['ArrowDown', 'PageDown', ' ', 'Enter'].includes(e.key)) open(); }, { once: true });
 }
 function start() { intro.active = true; intro.start = performance.now(); $('#top').classList.add('on'); if (reduced) { intro.active = false; sunrise(99); document.body.classList.add('title'); } }
 // восход над рельефом: солнце поднимается с востока, тени сползают, море ловит блик, маршрут прочерчивается, булавки зажигаются
