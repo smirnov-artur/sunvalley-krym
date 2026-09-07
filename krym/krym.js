@@ -345,12 +345,17 @@ void main(){ float sd = fract(aBird * 0.618 + 0.13); float t = uTime * (0.045 + 
 const BIRD_FRAG = /* glsl */`precision highp float; in float vA; uniform float uHazeBoost; out vec4 outColor; void main(){ float a = vA * (1.0 - uHazeBoost); outColor = vec4(vec3(0.08, 0.07, 0.06) * a, a); }`;
 
 const FS_VERT = /* glsl */`precision highp float; in vec3 position; in vec2 uv; out vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 1.0, 1.0); }`;
-const MIX_FRAG = /* glsl */`precision highp float; in vec2 vUv; out vec4 outColor; uniform sampler2D uA; uniform sampler2D uB; uniform float uMix; uniform float uZoom; uniform float uFog; uniform vec3 uFogCol; uniform sampler2D uNoise; uniform float uTime;
-void main(){ vec2 uvB = (vUv - 0.5) * (1.0 + (1.0 - uMix) * 0.10 * uZoom) + 0.5; vec3 a = texture(uA, vUv).rgb;
+const MIX_FRAG = /* glsl */`precision highp float; in vec2 vUv; out vec4 outColor; uniform sampler2D uA; uniform sampler2D uB; uniform float uMix; uniform float uZoom; uniform float uFog; uniform vec3 uFogCol; uniform sampler2D uNoise; uniform float uTime; uniform vec4 uIris; uniform float uAspect;
+void main(){ vec2 uvB = (vUv - 0.5) * (1.0 + (1.0 - uMix) * 0.10 * uZoom) + 0.5; vec2 uvA = mix(vUv, uIris.xy + (vUv - uIris.xy) * (1.0 - 0.12 * clamp(uIris.z / 1.7, 0.0, 1.0)), uIris.w); vec3 a = texture(uA, uvA).rgb;   // карта чуть наплывает вокруг точки, пока диафрагма растёт — падение в точку
   // дымка клочьями: плотность и граница смешения гуляют по шуму, экран не становится ровным листом
   float n = texture(uNoise, vUv * vec2(1.6, 1.0) + vec2(uTime * 0.012, uTime * 0.004)).r + 0.5 * texture(uNoise, vUv * vec2(3.2, 2.0) - vec2(uTime * 0.02, 0.0)).g;
   float mist = clamp(uFog * (0.72 + 0.4 * (n - 0.75)), 0.0, 1.0); a = mix(a, uFogCol * (0.9 + 0.2 * vUv.y), mist);
-  vec3 b = texture(uB, uvB).rgb; float m = smoothstep(0.0, 1.0, clamp(uMix + (n - 0.75) * 0.3 * (1.0 - abs(uMix * 2.0 - 1.0)), 0.0, 1.0)); outColor = vec4(mix(a, b, m), 1.0); }`;
+  vec3 b = texture(uB, uvB).rgb; float m = smoothstep(0.0, 1.0, clamp(uMix + (n - 0.75) * 0.3 * (1.0 - abs(uMix * 2.0 - 1.0)), 0.0, 1.0));
+  // диафрагма из точки места: полотно открывается изнутри точки на карте рваным светящимся кругом (uIris: центр, радиус, сила)
+  vec3 rim = vec3(0.0);
+  if (uIris.w > 0.001) { vec2 q = (vUv - uIris.xy) * vec2(uAspect, 1.0); float dd = length(q) + (n - 0.75) * 0.16; float inside = 1.0 - smoothstep(uIris.z - 0.06, uIris.z + 0.06, dd); m = max(m, inside * uIris.w);
+    rim = vec3(1.0, 0.86, 0.6) * exp(-abs(dd - uIris.z) * 30.0) * 0.42 * uIris.w * smoothstep(0.02, 0.18, uIris.z) * (1.0 - smoothstep(1.0, 1.5, uIris.z)); }
+  outColor = vec4(mix(a, b, m) + rim, 1.0); }`;
 const BLUR_FRAG = /* glsl */`precision highp float; in vec2 vUv; out vec4 outColor; uniform sampler2D uTex; uniform vec2 uTexel;
 void main(){ vec3 c = vec3(0.0); for (int y = -2; y <= 2; y++) for (int x = -2; x <= 2; x++) c += texture(uTex, vUv + vec2(float(x), float(y)) * uTexel * 2.0).rgb; outColor = vec4(c / 25.0, 1.0); }`;
 const POST_FRAG = /* glsl */`
@@ -668,7 +673,7 @@ function createRenderer(canvas, map, T) {
   const fsMesh = new THREE.Mesh(fsGeo, null); fsMesh.frustumCulled = false; fsScene.add(fsMesh);
   const fsMat = (frag, uniforms) => new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, uniforms, vertexShader: FS_VERT, fragmentShader: frag, depthTest: false, depthWrite: false });
   const SUN_UV = new THREE.Vector2(0.8, 0.9); const skyMat = fsMat(SKY_FRAG, { uTime: uM.uTime, uDawn: { value: 0 }, uSunUv: { value: SUN_UV } });
-  const uX = { uA: { value: null }, uB: { value: null }, uMix: { value: 0 }, uZoom: { value: 1 }, uFog: { value: 0 }, uFogCol: { value: new THREE.Vector3(0.3, 0.25, 0.2) }, uNoise: { value: noiseTex }, uTime: uS.uTime };
+  const uX = { uA: { value: null }, uB: { value: null }, uMix: { value: 0 }, uZoom: { value: 1 }, uFog: { value: 0 }, uFogCol: { value: new THREE.Vector3(0.3, 0.25, 0.2) }, uNoise: { value: noiseTex }, uTime: uS.uTime, uIris: { value: new THREE.Vector4(0.5, 0.5, 0, 0) }, uAspect: { value: 1.6 } };
   const uB = { uTex: { value: null }, uTexel: { value: new THREE.Vector2() } };
   const uP = { uScene: { value: null }, uBlur: { value: null }, uRes: { value: new THREE.Vector2() }, uTime: uS.uTime, uFade: { value: 0 }, uGrain: { value: 0.012 }, uVig: { value: 0.42 }, uBloom: { value: 0.3 }, uRays: { value: 0 }, uSunUv: { value: SUN_UV } };
   const mixMat = fsMat(MIX_FRAG, uX), blurMat = fsMat(BLUR_FRAG, uB), postMat = fsMat(POST_FRAG, uP);
@@ -694,7 +699,8 @@ function createRenderer(canvas, map, T) {
       if (T) { T.uni.uTime.value = time; T.uni.uCam.value.copy(mapCam.position); T.uni.uFocus.value.copy(uM.uFocus.value); T.uni.uFocusR.value = uM.uFocusR.value; T.uni.uFog.value = fogv * 0.85; T.uni.uFogCol.value.copy(uX.uFogCol.value); }
       renderer.setRenderTarget(rtMap); pass(skyMat, rtMap); renderer.clearDepth(); renderer.render(mapScene, mapCam);
     }
-    if (mixv > 0.001) { renderer.setRenderTarget(rtPaint); renderer.clear(); renderer.render(paintScene, paintCam); }
+    const irisOpen = uX.uIris.value.w > 0.001 && uX.uIris.value.z > 0.001;   // внутри диафрагмы полотно видно и при нулевом смешении
+    if (mixv > 0.001 || irisOpen) { renderer.setRenderTarget(rtPaint); renderer.clear(); renderer.render(paintScene, paintCam); }
     uX.uA.value = rtMap.texture; uX.uB.value = rtPaint.texture; uX.uMix.value = mixv; pass(mixMat, rtMix);
     uB.uTex.value = rtMix.texture; uB.uTexel.value.set(1 / rtA.width, 1 / rtA.height); pass(blurMat, rtA);
     uB.uTex.value = rtA.texture; pass(blurMat, rtB);
@@ -739,17 +745,17 @@ function applyTimeline(Pv, time) {
       bank = Math.sin(fly * Math.PI) * 0.055 * Math.sign(toPos[0] - fromPos[0] || 1) * (k > 0 ? 1 : 0.4);
       const tg = mix3([prev.x, prev.y, prev.z], [here.x, here.y, here.z], fly); tgt = tg;
     } else if (u < 0.75) {
-      const d = smooth((u - 0.4) / 0.35);
+      const d = smooth((u - 0.4) / 0.35); fov = 40 + 9 * Math.sin(d * Math.PI);   // угол шире на середине падения — ощущение скорости
       pos = mix3(toPos, camAt(k, 5), d); const arc = Math.sin(d * Math.PI) * 6.0; pos[0] += arc * Math.sign(here.x - prev.x || 1); tgt = [here.x, here.y, here.z];
       mixv = smooth((u - 0.50) / 0.16); zoom = 1 - d;
       // рельеф уходит в тёплую дымку цвета полотна, и из той же дымки, внахлёст, проступает полотно (без пустого экрана между ними)
-      fogv = smooth((u - 0.45) / 0.17); hazeBoost = 1 - smooth((u - 0.55) / 0.18);
+      fogv = smooth((u - 0.45) / 0.17); hazeBoost = 1 - smooth((u - 0.47) / 0.16);   // внутри открывающейся диафрагмы полотно проясняется вместе с её ростом
     } else if (u < 1.65) {
       pos = camAt(k, 5); tgt = [here.x, here.y, here.z]; mixv = 1; hold = (u - 0.75) / 0.9;
     } else {
-      const d = smooth((u - 1.65) / 0.25);
+      const d = smooth((u - 1.65) / 0.25); fov = 40 + 6 * Math.sin(d * Math.PI);
       pos = mix3(camAt(k, 5), camAt(k, 28), d); const lean = smooth((u - 1.72) / 0.18) * 0.12; pos[0] += (next.x - here.x) * lean; pos[2] += (next.z - here.z) * lean; tgt = [here.x + (next.x - here.x) * lean * 0.5, here.y, here.z + (next.z - here.z) * lean * 0.5]; mixv = 1 - smooth((u - 1.70) / 0.13); zoom = d;
-      hazeBoost = smooth((u - 1.65) / 0.12); fogv = 1 - smooth((u - 1.70) / 0.17);
+      hazeBoost = smooth((u - 1.72) / 0.18); fogv = 1 - smooth((u - 1.70) / 0.17);   // полотно остаётся видным внутри сжимающейся диафрагмы
     }
     R.uM.uFocus.value.copy(here); R.uM.uFocusR.value = 40;
   }
@@ -789,11 +795,20 @@ function applyTimeline(Pv, time) {
   R.uM.uLift.value = reduced ? 0 : lift;
   R.uX.uZoom.value = zoom;
   // булавки: активная глава крупнее и пульсирует
-  if (R.pins) R.pins.pins.forEach((p, i) => { const on = i === chapter || (chapter < 0 && i === 0); const visited = !intro.active && (Pv - 1) / L >= i - 0.6; const lit = (p.spr.userData.lit === undefined ? 1 : p.spr.userData.lit) * (intro.active || Pv < 1 ? 1 : (visited ? 1 : 0.45)); const sz = (on ? 0.075 + 0.012 * Math.sin(time * 2.2) : 0.04) * (0.4 + 0.6 * lit); p.spr.scale.set(sz, sz, 1); p.spr.material.opacity = (on ? 1 : 0.5) * R.uM.uReveal.value * lit; p.line.material.opacity = 0.7 * lit; });
+  // булавки: ядро (в пикселях экрана) и столб света (в мировых единицах); у цели столб выше и дышит, пройденные тише
+  const beaconK = chapter >= 0 ? (1 - mixv) : (intro.active ? (R.pins ? (R.pins.pins[0].spr.userData.lit || 0) : 0) : 1);
+  if (R.pins) R.pins.pins.forEach((p, i) => { const on = i === chapter || (chapter < 0 && i === 0); const visited = !intro.active && (Pv - 1) / L >= i - 0.6; const lit = (p.spr.userData.lit === undefined ? 1 : p.spr.userData.lit) * (intro.active || Pv < 1 ? 1 : (visited ? 1 : 0.45));
+    const rv = R.uM.uReveal.value; const pulse = 0.5 + 0.5 * Math.sin(time * 2.2); const sz = (on ? 0.026 + 0.006 * pulse : 0.016) * (0.5 + 0.5 * lit); p.spr.scale.set(sz, sz, 1); p.spr.material.opacity = (on ? 1 : 0.7) * rv * lit;
+    const bh = on ? (5.5 + 1.2 * pulse) * (0.4 + 0.6 * beaconK) : 2.4; p.beam.scale.set(on ? 0.7 : 0.4, bh, 1); p.beam.material.opacity = (on ? 0.85 : 0.35) * rv * lit; p.line.material.opacity = 0.5 * lit * rv; });
+  if (R.T) R.T.uni.uBeacon.value = reduced ? 0 : beaconK;
   // линия маршрута видна только с высоты
   const ro = 0.45 * clamp((pos[1] - 12) / 40, 0, 1); if (R.routeMat.uniforms) { R.routeMat.uniforms.uOpacity.value = ro; if (!intro.active) { R.routeMat.uniforms.uGhost.value = 0.28; R.routeMat.uniforms.uDraw.value = clamp((Pv - 1) / L / (CH.length - 1), 0, 1); } } else R.routeMat.opacity = ro;
   document.body.classList.toggle('far', pos[1] > 120);
   const end = clamp((Pv - (1 + L * CH.length) + 0.3) / 0.6, 0, 1);
+  // диафрагма нырка: полотно открывается из спроецированной точки места, из неё же бьют лучи; на выходе закрывается обратно в точку
+  { const ir = R.uX.uIris.value; R.uX.uAspect.value = window.innerWidth / Math.max(1, window.innerHeight); let irR = 0, irK = 0, burst = 0;
+    if (chapter >= 0 && !reduced) { const u = uCh; if (u >= 0.40 && u < 0.75) { irR = 1.7 * smooth((u - 0.45) / 0.24); irK = 1; burst = Math.sin(clamp((u - 0.44) / 0.28, 0, 1) * Math.PI); } else if (u >= 1.65) { irR = 1.7 * (1 - smooth((u - 1.66) / 0.19)); irK = 1; burst = 0.6 * Math.sin(clamp((u - 1.66) / 0.2, 0, 1) * Math.PI); } }
+    if (irK > 0) { const h = R.routePts[chapter]; R.mapCam.updateMatrixWorld(); const pr = R.project(h.x, h.y, h.z); const cx = clamp(pr.x, 0.1, 0.9), cy = clamp(1 - pr.y, 0.1, 0.9); ir.set(cx, cy, irR, irK); if (burst > 0.001) { R.uP.uRays.value = Math.max(R.uP.uRays.value, 0.6 * burst); R.uP.uSunUv.value.set(cx, cy); } } else ir.w = 0; }
   R.uP.uFade.value = (intro.active ? intro.t : 1) * (1 - end * 0.85);
   return { chapter, mixv, hold, fog: reduced ? 0 : fogv };
 }

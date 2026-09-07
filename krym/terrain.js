@@ -63,7 +63,7 @@ precision highp float;
 in vec2 vUv; in vec3 vWorld; in float vH;
 uniform sampler2D uHgt; uniform sampler2D uHgtE; uniform sampler2D uHgtS; uniform sampler2D uShore; uniform sampler2D uNoise;
 uniform vec4 uPatchE; uniform vec4 uPatchS; uniform float uHasPatch; uniform float uIsPatch; uniform vec2 uTexel; uniform float uKmPx; uniform vec2 uTexelP; uniform float uKmPxP; uniform vec4 uMyRect;
-uniform vec3 uCam; uniform vec3 uSun; uniform vec3 uSunCol; uniform float uSunI; uniform float uAmb; uniform float uTime; uniform vec3 uFogCol; uniform float uFog; uniform vec3 uFocus; uniform float uFocusR; uniform float uReveal;
+uniform vec3 uCam; uniform vec3 uSun; uniform vec3 uSunCol; uniform float uSunI; uniform float uAmb; uniform float uTime; uniform vec3 uFogCol; uniform float uFog; uniform vec3 uFocus; uniform float uFocusR; uniform float uReveal; uniform float uBeacon;
 out vec4 outColor;
 ${COMMON}
 void main(){
@@ -118,29 +118,36 @@ void main(){
   float lineK = smoothstep(40.0, 200.0, dist) * 0.35 + 0.06; col += vec3(1.0, 0.85, 0.55) * line * lineK * 0.5 * step(0.5, vH);
   // очаг внимания: тёплый свет вокруг точки главы
   float fr = uFocusR * 0.45; float fd = length(vWorld.xz - uFocus.xz); float focus = exp(-fd * fd / (fr * fr)); col *= 1.0 + focus * 0.30;
+  // маяк главы: земля вокруг точки чуть темнеет (контраст), от точки бегут кольца света, в центре горячее ядро
+  if (uBeacon > 0.001) { float halo = smoothstep(1.2, 5.0, fd) * (1.0 - smoothstep(5.0, 16.0, fd)); col *= 1.0 - 0.26 * halo * uBeacon;
+    vec3 bc = vec3(1.0, 0.96, 0.84); float rings = 0.0; for (int i = 0; i < 2; i++) { float ph = fract(uTime * 0.28 + float(i) * 0.5); float rr = ph * 7.0; rings += exp(-abs(fd - rr) * 4.0) * (1.0 - ph) * (1.0 - ph); }
+    col += bc * rings * 0.9 * uBeacon + bc * exp(-fd * fd / 0.2) * 0.9 * uBeacon; }
   // дымка по дальности и туман перехода
   float fog = 1.0 - exp(-dist * 0.0022 * clamp(70.0 / max(uCam.y, 1.0), 0.22, 1.0)); float mist = 0.8 + 0.4 * texture(uNoise, vWorld.xz * 0.012 + vec2(uTime * 0.01, -uTime * 0.006)).b;
   vec3 fogC = mix(uFogCol, vec3(0.30, 0.33, 0.40), smoothstep(40.0, 220.0, uCam.y) * 0.55 * (1.0 - uFog));
   col = mix(col, fogC, clamp(fog * 0.85 + uFog * mist * (0.25 + 0.75 * smoothstep(0.0, 45.0, dist)), 0.0, 1.0));
   vec2 buv = uIsPatch > 0.5 ? vec2(0.5) : vUv; float edge = smoothstep(0.0, 0.10, min(min(buv.x, 1.0 - buv.x), min(buv.y, 1.0 - buv.y)));
-  edge *= smoothstep(0.045, 0.13, buv.y) * (1.0 - smoothstep(0.93, 0.99, buv.x));   // материк за Перекопом и Тамань уходят в темноту
-  col = mix(vec3(0.028, 0.026, 0.032), col, edge);
+  { float ne = texture(uNoise, vWorld.xz * 0.018).r * 0.06; edge *= smoothstep(0.03 + ne, 0.22 + ne, buv.y) * (1.0 - smoothstep(0.90 - ne, 0.99, buv.x)); }   // материк за Перекопом и Тамань растворяются в дымке рваным, не прямым краем
+  // край материка уходит ровно в тот тон, каким рядом написано море (глубокая вода + та же дымка + тот же дальний воздух), поэтому кромки плиты не видно
+  vec3 seaLike = mix(vec3(0.020, 0.062, 0.095), fogC, clamp(fog * 0.85, 0.0, 1.0)); seaLike = mix(seaLike, mix(vec3(0.026, 0.028, 0.036), fogC, 0.12), smoothstep(200.0, 520.0, dist));
+  col = mix(seaLike, col, edge);
   outColor = vec4(col * uReveal, 1.0);
 }
 `;
 
 const SEA_VERT = /* glsl */`
 precision highp float; in vec3 position; in vec2 uv;
-uniform mat4 projectionMatrix; uniform mat4 modelViewMatrix; out vec2 vUv; out vec3 vWorld;
-void main(){ vUv = uv; vWorld = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+uniform mat4 projectionMatrix; uniform mat4 modelViewMatrix; uniform vec2 uSize; out vec2 vUv; out vec3 vWorld;
+void main(){ vUv = position.xz / uSize + 0.5; vWorld = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }   // uv от мира: плоскость моря шире карты
 `;
 const SEA_FRAG = /* glsl */`
 precision highp float; in vec2 vUv; in vec3 vWorld;
-uniform sampler2D uHgt; uniform sampler2D uShore; uniform sampler2D uNoise; uniform vec3 uCam; uniform vec3 uSun; uniform vec3 uSunCol; uniform float uSunI; uniform float uAmb; uniform float uTime; uniform vec3 uFogCol; uniform float uFog; uniform vec3 uFocus; uniform float uFocusR; uniform float uReveal;
+uniform sampler2D uHgt; uniform sampler2D uShore; uniform sampler2D uNoise; uniform vec3 uCam; uniform vec3 uSun; uniform vec3 uSunCol; uniform float uSunI; uniform float uAmb; uniform float uTime; uniform vec3 uFogCol; uniform float uFog; uniform vec3 uFocus; uniform float uFocusR; uniform float uReveal; uniform float uBeacon;
 out vec4 outColor;
 void main(){
   // море не отбрасывает пиксели по грубой карте: суша лежит выше и закрывает его по глубине (иначе у берега щель между сетками)
-  float shore = texture(uShore, vUv).r * 25.5;   // км до суши
+  bool outside = any(lessThan(vUv, vec2(0.0))) || any(greaterThan(vUv, vec2(1.0)));   // за картой — открытое море до горизонта
+  float shore = outside ? 25.5 : texture(uShore, vUv).r * 25.5;   // км до суши
   vec3 V = normalize(uCam - vWorld); vec3 L = normalize(uSun);
   // волны: две шумовые нормали разных масштабов
   vec2 p = vWorld.xz;
@@ -161,10 +168,13 @@ void main(){
   float foam = (1.0 - smoothstep(0.0, 0.45, shore)) * smoothstep(0.55, 0.9, texture(uNoise, p * 0.6 + vec2(uTime * 0.03, 0.0)).a);
   col += vec3(0.7, 0.72, 0.7) * foam * 0.5; col += vec3(0.35, 0.40, 0.42) * (1.0 - smoothstep(0.0, 0.25, shore)) * 0.35;
   float fr = uFocusR * 0.45; float fd = length(vWorld.xz - uFocus.xz); float focus = exp(-fd * fd / (fr * fr)); col *= 1.0 + focus * 0.18;
+  if (uBeacon > 0.001) { float halo = smoothstep(1.2, 5.0, fd) * (1.0 - smoothstep(5.0, 16.0, fd)); col *= 1.0 - 0.18 * halo * uBeacon;
+    vec3 bc = vec3(1.0, 0.96, 0.84); float rings = 0.0; for (int i = 0; i < 2; i++) { float ph = fract(uTime * 0.28 + float(i) * 0.5); float rr = ph * 7.0; rings += exp(-abs(fd - rr) * 4.0) * (1.0 - ph) * (1.0 - ph); }
+    col += bc * rings * 0.7 * uBeacon; }
   float dist = length(uCam - vWorld); float fog = 1.0 - exp(-dist * 0.0022 * clamp(70.0 / max(uCam.y, 1.0), 0.22, 1.0)); float mist = 0.8 + 0.4 * texture(uNoise, vWorld.xz * 0.012 + vec2(uTime * 0.01, -uTime * 0.006)).b;
   vec3 fogC = mix(uFogCol, vec3(0.30, 0.33, 0.40), smoothstep(40.0, 220.0, uCam.y) * 0.55 * (1.0 - uFog));
   col = mix(col, fogC, clamp(fog * 0.85 + uFog * mist * (0.25 + 0.75 * smoothstep(0.0, 45.0, dist)), 0.0, 1.0));
-  float edge = smoothstep(0.0, 0.10, min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y))); col = mix(vec3(0.028, 0.026, 0.032), col, edge);
+  col = mix(col, mix(vec3(0.026, 0.028, 0.036), fogC, 0.12), smoothstep(200.0, 520.0, dist));   // у горизонта море растворяется в тёмном воздухе, а не обрывается краем
   outColor = vec4(col * uReveal, 1.0);
 }
 `;
@@ -179,7 +189,7 @@ void main(){
   // та же выборка, что у теней на земле (LAND_FRAG): облако ровно над своей тенью
   float cl = texture(uNoise, vWorld.xz * 0.009 + vec2(uTime * 0.004, uTime * 0.0025)).g; float puff = texture(uNoise, vWorld.xz * 0.035 + vec2(uTime * 0.005, uTime * 0.002)).r; float fine = texture(uNoise, vWorld.xz * 0.09 - vec2(uTime * 0.006, uTime * 0.003)).b;
   float a = smoothstep(0.50, 0.80, cl) * smoothstep(0.42, 0.75, puff) * (0.6 + 0.4 * fine) * 0.75;
-  float edge = smoothstep(0.0, 0.12, min(min(vUv.x, 1.0 - vUv.x), min(vUv.y, 1.0 - vUv.y)));
+  float edge = 1.0;   // облака не обрываются по краю карты, только тают по дальности
   float dist = length(uCam - vWorld); a *= edge * (1.0 - uFog) * uReveal * (1.0 - smoothstep(180.0, 420.0, dist));
   vec3 col = (uSunCol * uSunI * 0.55 + vec3(0.42, 0.46, 0.58) * 0.5 * uAmb) * (0.85 + 0.15 * fine);
   outColor = vec4(col * a, a);
@@ -205,7 +215,7 @@ export async function createTerrain({ meta, noiseTex, mobile }) {
   const loadPatch = async (name) => { const m = await (await fetch('data/' + name + '.json')).json(); const t = await loadPacked('data/' + name + '.png'); const a = uvOf(m.lonW, m.latN), b = uvOf(m.lonE, m.latS); return { name, tex: t, rect: [a[0], a[1], b[0], b[1]], kmPx: m.kmPerPx, w: t.w, h: t.h }; };
   const uni = {
     uCam: { value: new THREE.Vector3() }, uSun: { value: new THREE.Vector3(0.64, 0.42, 0.64).normalize() }, uSunCol: { value: new THREE.Vector3(1.0, 0.86, 0.62) }, uSunI: { value: 1.35 }, uAmb: { value: 1 }, uTime: { value: 0 }, uFogCol: { value: new THREE.Vector3(0.36, 0.30, 0.25) }, uFog: { value: 0 },
-    uFocus: { value: new THREE.Vector3() }, uFocusR: { value: 60 }, uReveal: { value: 1 }, uNoise: { value: noiseTex },
+    uFocus: { value: new THREE.Vector3() }, uFocusR: { value: 60 }, uReveal: { value: 1 }, uNoise: { value: noiseTex }, uBeacon: { value: 0 },
   };
   const blank = new THREE.DataTexture(new Uint16Array([0]), 1, 1, THREE.RedFormat, THREE.HalfFloatType); blank.needsUpdate = true;
   const shared = { uHgtE: { value: blank }, uHgtS: { value: blank }, uPatchE: { value: new THREE.Vector4(2, 2, 3, 3) }, uPatchS: { value: new THREE.Vector4(2, 2, 3, 3) }, uHasPatch: { value: 0 } };
@@ -215,7 +225,8 @@ export async function createTerrain({ meta, noiseTex, mobile }) {
   const land = new THREE.Mesh(grid(wKm, hKm, segB[0], segB[1]), landMat(false, base, [1 / base.w, 1 / base.h], liteBase ? 0.432 : 0.216)); land.frustumCulled = false; land.renderOrder = 0; group.add(land);
   const addPatch = (p) => { patches.push(p); const segs = [Math.round(p.w / 2), Math.round(p.h / 2)]; const m = new THREE.Mesh(grid(wKm, hKm, segs[0], segs[1], p.rect), landMat(true, p.tex, [1 / p.w, 1 / p.h], p.kmPx)); m.material.uniforms.uMyRect.value.set(...p.rect); m.frustumCulled = false; m.renderOrder = 0; group.add(m);
     const key = p.name === 'hgt-east' ? 'E' : 'S'; shared['uHgt' + key].value = p.tex.tex; shared['uPatch' + key].value.set(...p.rect); shared.uHasPatch.value = 1; };
-  const sea = new THREE.Mesh(grid(wKm, hKm, 2, 2), new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: SEA_VERT, fragmentShader: SEA_FRAG, uniforms: { ...uni, uHgt: { value: base.tex }, uShore: { value: base.shore } }, side: THREE.DoubleSide }));
+  // море втрое шире карты: за её краями открытая вода до горизонта, плита с углами не видна
+  const sea = new THREE.Mesh(grid(wKm * 3, hKm * 3, 2, 2), new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: SEA_VERT, fragmentShader: SEA_FRAG, uniforms: { ...uni, uHgt: { value: base.tex }, uShore: { value: base.shore }, uSize: { value: new THREE.Vector2(wKm, hKm) } }, side: THREE.DoubleSide }));
   // подмена облегчённой базы полной: те же сетки, только текстуры высот и берега (и шаг текселя для нормалей); патчи — после неё
   const swapBase = async () => {
     if (!liteBase) return; const full = await loadPacked('data/hgt-base.png');
@@ -225,7 +236,7 @@ export async function createTerrain({ meta, noiseTex, mobile }) {
   const ready = (mobile ? ['hgt-east'] : ['hgt-east', 'hgt-south']).reduce((pr, name) => pr.then(() => loadPatch(name).then(addPatch).catch((e) => console.warn('[terrain] нет патча', name))), swapBase().catch((e) => console.warn('[terrain] полная база', e)));
   sea.position.y = -0.012; sea.frustumCulled = false; sea.renderOrder = -1; group.add(sea);
   // облака: редкие, над горами, тень под ними уже лежит на земле
-  const clouds = new THREE.Mesh(grid(wKm, hKm, 2, 2), new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: CLOUD_VERT, fragmentShader: CLOUD_FRAG, uniforms: { uNoise: uni.uNoise, uTime: uni.uTime, uCam: uni.uCam, uSunCol: uni.uSunCol, uSunI: uni.uSunI, uAmb: uni.uAmb, uFog: uni.uFog, uReveal: uni.uReveal }, transparent: true, depthWrite: false, depthTest: true, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor, side: THREE.DoubleSide }));
+  const clouds = new THREE.Mesh(grid(wKm * 2, hKm * 2, 2, 2), new THREE.RawShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: CLOUD_VERT, fragmentShader: CLOUD_FRAG, uniforms: { uNoise: uni.uNoise, uTime: uni.uTime, uCam: uni.uCam, uSunCol: uni.uSunCol, uSunI: uni.uSunI, uAmb: uni.uAmb, uFog: uni.uFog, uReveal: uni.uReveal }, transparent: true, depthWrite: false, depthTest: true, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor, side: THREE.DoubleSide }));
   clouds.position.y = 3.0 * EXAG;   /* 3 км над уровнем моря в единицах мира */ clouds.frustumCulled = false; clouds.renderOrder = 1; group.add(clouds);
   // высота в километрах мира по базовым высотам (билинейно) — для маршрута и булавок
   const heightAt = (x, z) => { const u = (x / wKm + 0.5) * (base.w - 1), v = (z / hKm + 0.5) * (base.h - 1); const i = Math.max(0, Math.min(base.w - 2, Math.floor(u))), j = Math.max(0, Math.min(base.h - 2, Math.floor(v))); const fu = u - i, fv = v - j; const H = base.hgt, w = base.w; const h = (H[j * w + i] * (1 - fu) + H[j * w + i + 1] * fu) * (1 - fv) + (H[(j + 1) * w + i] * (1 - fu) + H[(j + 1) * w + i + 1] * fu) * fv; return Math.max(h, 0) / 1000 * EXAG; };
@@ -252,12 +263,20 @@ export function makeRoute(points, heightAt) {
 export function makePins(points, heightAt) {
   const g = new THREE.Group(); const pins = [];
   const glowTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,225,160,1)'); gr.addColorStop(0.25, 'rgba(255,205,120,0.55)'); gr.addColorStop(1, 'rgba(255,190,100,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace; return t; })();
+  // столб света: снизу яркий, к верху тает, по ширине мягкий; в мировых единицах, чтобы на подлёте вырастал
+  const beamTex = (() => { const w = 32, h = 128; const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); const im = x.createImageData(w, h);
+    for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) { const dx = (i + 0.5 - w / 2) / (w / 2); const v = Math.pow(1 - j / h, 0.45) * Math.exp(-dx * dx * 5.0); const o = (j * w + i) * 4; im.data[o] = 255; im.data[o + 1] = 244; im.data[o + 2] = 214; im.data[o + 3] = Math.round(255 * Math.min(1, v)); }
+    x.putImageData(im, 0, 0); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace; return t; })();
+  // ядро: белое зерно с тёмным ободком — читается и на золотой земле, и на белом облаке; размер в пикселях экрана
+  const coreTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'); const gr = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gr.addColorStop(0, 'rgba(255,250,236,1)'); gr.addColorStop(0.26, 'rgba(255,238,200,1)'); gr.addColorStop(0.34, 'rgba(30,22,14,0.9)'); gr.addColorStop(0.5, 'rgba(30,22,14,0.45)'); gr.addColorStop(0.7, 'rgba(30,22,14,0)'); x.fillStyle = gr; x.fillRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace; return t; })();
   for (const p of points) {
     const y0 = heightAt(p.x, p.z), top = y0 + 2.6;
     const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(p.x, y0, p.z), new THREE.Vector3(p.x, top, p.z)]);
-    const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xf0d090, transparent: true, opacity: 0.7, depthTest: true, depthWrite: false })); line.frustumCulled = false; line.renderOrder = 1;
-    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffe0a0, transparent: true, opacity: 0.6, depthTest: false, depthWrite: false, sizeAttenuation: false, blending: THREE.AdditiveBlending })); spr.position.set(p.x, top, p.z); spr.scale.set(0.045, 0.045, 1); spr.renderOrder = 2;
-    g.add(line, spr); pins.push({ line, spr, top: new THREE.Vector3(p.x, top, p.z) });
+    const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xfff0d0, transparent: true, opacity: 0.5, depthTest: true, depthWrite: false })); line.frustumCulled = false; line.renderOrder = 1;
+    const beam = new THREE.Sprite(new THREE.SpriteMaterial({ map: beamTex, color: 0xffeecc, transparent: true, opacity: 0.5, depthTest: false, depthWrite: false, sizeAttenuation: true, blending: THREE.AdditiveBlending })); beam.center.set(0.5, 0); beam.position.set(p.x, y0, p.z); beam.scale.set(0.5, 3.0, 1); beam.renderOrder = 2;
+    const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: coreTex, color: 0xffffff, transparent: true, opacity: 0.9, depthTest: false, depthWrite: false, sizeAttenuation: false })); spr.position.set(p.x, top, p.z); spr.scale.set(0.02, 0.02, 1); spr.renderOrder = 3;
+    g.add(line, beam, spr); pins.push({ line, spr, beam, top: new THREE.Vector3(p.x, top, p.z), base: new THREE.Vector3(p.x, y0, p.z) });
   }
   // комета: бежит по маршруту, пока он прочерчивается на восходе
   const comet = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xffe8b0, transparent: true, opacity: 0, depthTest: false, depthWrite: false, sizeAttenuation: false, blending: THREE.AdditiveBlending })); comet.scale.set(0.09, 0.09, 1); comet.renderOrder = 3; g.add(comet);
