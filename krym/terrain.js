@@ -63,7 +63,7 @@ precision highp float;
 in vec2 vUv; in vec3 vWorld; in float vH;
 uniform sampler2D uHgt; uniform sampler2D uHgtE; uniform sampler2D uHgtS; uniform sampler2D uShore; uniform sampler2D uNoise;
 uniform vec4 uPatchE; uniform vec4 uPatchS; uniform float uHasPatch; uniform float uIsPatch; uniform vec2 uTexel; uniform float uKmPx; uniform vec2 uTexelP; uniform float uKmPxP; uniform vec4 uMyRect;
-uniform vec3 uCam; uniform vec3 uSun; uniform vec3 uSunCol; uniform float uSunI; uniform float uAmb; uniform float uTime; uniform vec3 uFogCol; uniform float uFog; uniform vec3 uFocus; uniform float uFocusR; uniform float uReveal; uniform float uBeacon;
+uniform vec3 uCam; uniform vec3 uSun; uniform vec3 uSunCol; uniform float uSunI; uniform float uAmb; uniform float uTime; uniform vec3 uFogCol; uniform float uFog; uniform vec3 uFocus; uniform float uFocusR; uniform float uReveal; uniform float uBeacon; uniform float uRingK; uniform float uHaloK; uniform float uCoreK;
 out vec4 outColor;
 ${COMMON}
 void main(){
@@ -119,9 +119,9 @@ void main(){
   // очаг внимания: тёплый свет вокруг точки главы
   float fr = uFocusR * 0.45; float fd = length(vWorld.xz - uFocus.xz); float focus = exp(-fd * fd / (fr * fr)); col *= 1.0 + focus * 0.30;
   // маяк главы: земля вокруг точки чуть темнеет (контраст), от точки бегут кольца света, в центре горячее ядро
-  if (uBeacon > 0.001) { float halo = smoothstep(1.2, 5.0, fd) * (1.0 - smoothstep(5.0, 16.0, fd)); col *= 1.0 - 0.26 * halo * uBeacon;
+  if (uBeacon > 0.001) { float halo = smoothstep(1.2, 5.0, fd) * (1.0 - smoothstep(5.0, 16.0, fd)); col *= 1.0 - uHaloK * halo * uBeacon;
     vec3 bc = vec3(1.0, 0.96, 0.84); float rings = 0.0; for (int i = 0; i < 2; i++) { float ph = fract(uTime * 0.28 + float(i) * 0.5); float rr = ph * 7.0; rings += exp(-abs(fd - rr) * 4.0) * (1.0 - ph) * (1.0 - ph); }
-    col += bc * rings * 0.9 * uBeacon + bc * exp(-fd * fd / 0.2) * 0.9 * uBeacon; }
+    col += bc * rings * uRingK * uBeacon + bc * exp(-fd * fd / 0.2) * uCoreK * uBeacon; }
   // дымка по дальности и туман перехода
   float fog = 1.0 - exp(-dist * 0.0022 * clamp(70.0 / max(uCam.y, 1.0), 0.22, 1.0)); float mist = 0.8 + 0.4 * texture(uNoise, vWorld.xz * 0.012 + vec2(uTime * 0.01, -uTime * 0.006)).b;
   vec3 fogC = mix(uFogCol, vec3(0.30, 0.33, 0.40), smoothstep(40.0, 220.0, uCam.y) * 0.55 * (1.0 - uFog));
@@ -142,7 +142,7 @@ void main(){ vUv = position.xz / uSize + 0.5; vWorld = position; gl_Position = p
 `;
 const SEA_FRAG = /* glsl */`
 precision highp float; in vec2 vUv; in vec3 vWorld;
-uniform sampler2D uHgt; uniform sampler2D uShore; uniform sampler2D uNoise; uniform vec3 uCam; uniform vec3 uSun; uniform vec3 uSunCol; uniform float uSunI; uniform float uAmb; uniform float uTime; uniform vec3 uFogCol; uniform float uFog; uniform vec3 uFocus; uniform float uFocusR; uniform float uReveal; uniform float uBeacon;
+uniform sampler2D uHgt; uniform sampler2D uShore; uniform sampler2D uNoise; uniform vec3 uCam; uniform vec3 uSun; uniform vec3 uSunCol; uniform float uSunI; uniform float uAmb; uniform float uTime; uniform vec3 uFogCol; uniform float uFog; uniform vec3 uFocus; uniform float uFocusR; uniform float uReveal; uniform float uBeacon; uniform float uRingK; uniform float uHaloK; uniform float uCoreK;
 out vec4 outColor;
 void main(){
   // море не отбрасывает пиксели по грубой карте: суша лежит выше и закрывает его по глубине (иначе у берега щель между сетками)
@@ -168,9 +168,9 @@ void main(){
   float foam = (1.0 - smoothstep(0.0, 0.45, shore)) * smoothstep(0.55, 0.9, texture(uNoise, p * 0.6 + vec2(uTime * 0.03, 0.0)).a);
   col += vec3(0.7, 0.72, 0.7) * foam * 0.5; col += vec3(0.35, 0.40, 0.42) * (1.0 - smoothstep(0.0, 0.25, shore)) * 0.35;
   float fr = uFocusR * 0.45; float fd = length(vWorld.xz - uFocus.xz); float focus = exp(-fd * fd / (fr * fr)); col *= 1.0 + focus * 0.18;
-  if (uBeacon > 0.001) { float halo = smoothstep(1.2, 5.0, fd) * (1.0 - smoothstep(5.0, 16.0, fd)); col *= 1.0 - 0.18 * halo * uBeacon;
+  if (uBeacon > 0.001) { float halo = smoothstep(1.2, 5.0, fd) * (1.0 - smoothstep(5.0, 16.0, fd)); col *= 1.0 - uHaloK * 0.7 * halo * uBeacon;
     vec3 bc = vec3(1.0, 0.96, 0.84); float rings = 0.0; for (int i = 0; i < 2; i++) { float ph = fract(uTime * 0.28 + float(i) * 0.5); float rr = ph * 7.0; rings += exp(-abs(fd - rr) * 4.0) * (1.0 - ph) * (1.0 - ph); }
-    col += bc * rings * 0.7 * uBeacon; }
+    col += bc * rings * uRingK * 0.8 * uBeacon; }
   float dist = length(uCam - vWorld); float fog = 1.0 - exp(-dist * 0.0022 * clamp(70.0 / max(uCam.y, 1.0), 0.22, 1.0)); float mist = 0.8 + 0.4 * texture(uNoise, vWorld.xz * 0.012 + vec2(uTime * 0.01, -uTime * 0.006)).b;
   vec3 fogC = mix(uFogCol, vec3(0.30, 0.33, 0.40), smoothstep(40.0, 220.0, uCam.y) * 0.55 * (1.0 - uFog));
   col = mix(col, fogC, clamp(fog * 0.85 + uFog * mist * (0.25 + 0.75 * smoothstep(0.0, 45.0, dist)), 0.0, 1.0));
@@ -215,7 +215,7 @@ export async function createTerrain({ meta, noiseTex, mobile }) {
   const loadPatch = async (name) => { const m = await (await fetch('data/' + name + '.json')).json(); const t = await loadPacked('data/' + name + '.png'); const a = uvOf(m.lonW, m.latN), b = uvOf(m.lonE, m.latS); return { name, tex: t, rect: [a[0], a[1], b[0], b[1]], kmPx: m.kmPerPx, w: t.w, h: t.h }; };
   const uni = {
     uCam: { value: new THREE.Vector3() }, uSun: { value: new THREE.Vector3(0.64, 0.42, 0.64).normalize() }, uSunCol: { value: new THREE.Vector3(1.0, 0.86, 0.62) }, uSunI: { value: 1.35 }, uAmb: { value: 1 }, uTime: { value: 0 }, uFogCol: { value: new THREE.Vector3(0.36, 0.30, 0.25) }, uFog: { value: 0 },
-    uFocus: { value: new THREE.Vector3() }, uFocusR: { value: 60 }, uReveal: { value: 1 }, uNoise: { value: noiseTex }, uBeacon: { value: 0 },
+    uFocus: { value: new THREE.Vector3() }, uFocusR: { value: 60 }, uReveal: { value: 1 }, uNoise: { value: noiseTex }, uBeacon: { value: 0 }, uRingK: { value: 0.9 }, uHaloK: { value: 0.26 }, uCoreK: { value: 0.9 },
   };
   const blank = new THREE.DataTexture(new Uint16Array([0]), 1, 1, THREE.RedFormat, THREE.HalfFloatType); blank.needsUpdate = true;
   const shared = { uHgtE: { value: blank }, uHgtS: { value: blank }, uPatchE: { value: new THREE.Vector4(2, 2, 3, 3) }, uPatchS: { value: new THREE.Vector4(2, 2, 3, 3) }, uHasPatch: { value: 0 } };

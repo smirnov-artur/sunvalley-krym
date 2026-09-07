@@ -719,6 +719,20 @@ window.__krym = { get R() { return R; }, CH, L, SET };
 const pointer = { x: 0, y: 0, sx: 0, sy: 0 };
 window.addEventListener('pointermove', (e) => { pointer.x = (e.clientX / innerWidth) * 2 - 1; pointer.y = -((e.clientY / innerHeight) * 2 - 1); }, { passive: true });
 const intro = { active: false, start: 0, t: 0 };
+// настройка маяка: столб (высота/ширина у цели), кольца, ореол, ядро; из адреса, панель ползунков по ?tune=1
+const TUNE = { beam: 5.5, beamw: 0.7, rings: 0.9, halo: 0.26, core: 0.9 };
+{ const q = new URLSearchParams(location.search); for (const key of Object.keys(TUNE)) if (q.has(key) && isFinite(+q.get(key))) TUNE[key] = +q.get(key); }
+function setupTune() {
+  if (!new URLSearchParams(location.search).has('tune')) return;
+  const box = document.createElement('div'); box.id = 'tune'; box.style.cssText = 'position:fixed;left:16px;top:70px;z-index:50;background:rgba(10,8,6,.82);color:#efe6d6;font:12px/1.5 Arial;padding:12px 14px;border:1px solid rgba(232,194,122,.35);width:240px;pointer-events:auto';
+  const rows = [['beam', 'столб: высота', 1, 12, 0.1], ['beamw', 'столб: ширина', 0.2, 2, 0.05], ['rings', 'кольца', 0, 3, 0.05], ['halo', 'ореол (затемнение)', 0, 0.6, 0.02], ['core', 'ядро на земле', 0, 3, 0.05]];
+  const out = document.createElement('div'); out.style.cssText = 'margin-top:8px;font-family:monospace;font-size:11px;word-break:break-all;color:#e8c27a';
+  const upd = () => { out.textContent = '?' + Object.keys(TUNE).map(x => x + '=' + TUNE[x]).join('&'); };
+  for (const [key, label, min, max, step] of rows) { const l = document.createElement('label'); l.style.display = 'block'; const v = document.createElement('b'); v.textContent = TUNE[key]; v.style.float = 'right';
+    const r = document.createElement('input'); r.type = 'range'; r.min = min; r.max = max; r.step = step; r.value = TUNE[key]; r.style.width = '100%'; r.oninput = () => { TUNE[key] = +r.value; v.textContent = r.value; upd(); };
+    l.append(label, v, r); box.appendChild(l); }
+  box.appendChild(out); upd(); document.body.appendChild(box);
+}
 const OVER = mobile ? { pos: [15, 520, 250], tgt: [15, 0, 25], fov: 50 } : { pos: [-50, 205, 205], tgt: [-68, 0, 12], fov: 40 };   // на телефоне обзор выше и шире, чтобы полуостров влез в портрет
 
 function camAt(k, alt) { const p = R.routePts[k]; return [p.x, p.y + alt, p.z + alt * 0.55]; }
@@ -799,8 +813,8 @@ function applyTimeline(Pv, time) {
   const beaconK = chapter >= 0 ? (1 - mixv) : (intro.active ? (R.pins ? (R.pins.pins[0].spr.userData.lit || 0) : 0) : 1);
   if (R.pins) R.pins.pins.forEach((p, i) => { const on = i === chapter || (chapter < 0 && i === 0); const visited = !intro.active && (Pv - 1) / L >= i - 0.6; const lit = (p.spr.userData.lit === undefined ? 1 : p.spr.userData.lit) * (intro.active || Pv < 1 ? 1 : (visited ? 1 : 0.45));
     const rv = R.uM.uReveal.value; const pulse = 0.5 + 0.5 * Math.sin(time * 2.2); const sz = (on ? 0.026 + 0.006 * pulse : 0.016) * (0.5 + 0.5 * lit); p.spr.scale.set(sz, sz, 1); p.spr.material.opacity = (on ? 1 : 0.7) * rv * lit;
-    const bh = on ? (5.5 + 1.2 * pulse) * (0.4 + 0.6 * beaconK) : 2.4; p.beam.scale.set(on ? 0.7 : 0.4, bh, 1); p.beam.material.opacity = (on ? 0.85 : 0.35) * rv * lit; p.line.material.opacity = 0.5 * lit * rv; });
-  if (R.T) R.T.uni.uBeacon.value = reduced ? 0 : beaconK;
+    const bh = on ? (TUNE.beam + TUNE.beam * 0.22 * pulse) * (0.4 + 0.6 * beaconK) : TUNE.beam * 0.44; p.beam.scale.set(on ? TUNE.beamw : TUNE.beamw * 0.57, bh, 1); p.beam.material.opacity = (on ? 0.85 : 0.35) * rv * lit; p.line.material.opacity = 0.5 * lit * rv; });
+  if (R.T) { R.T.uni.uBeacon.value = reduced ? 0 : beaconK; R.T.uni.uRingK.value = TUNE.rings; R.T.uni.uHaloK.value = TUNE.halo; R.T.uni.uCoreK.value = TUNE.core; }
   // линия маршрута видна только с высоты
   const ro = 0.45 * clamp((pos[1] - 12) / 40, 0, 1); if (R.routeMat.uniforms) { R.routeMat.uniforms.uOpacity.value = ro; if (!intro.active) { R.routeMat.uniforms.uGhost.value = 0.28; R.routeMat.uniforms.uDraw.value = clamp((Pv - 1) / L / (CH.length - 1), 0, 1); } } else R.routeMat.opacity = ro;
   document.body.classList.toggle('far', pos[1] > 120);
@@ -934,7 +948,7 @@ async function main() {
   setP(0.6); lap('map');
   R = createRenderer($('#gl'), map, T);
   setupMarks(); setupScroll(); fillCredits(); loadNow();
-  const sb = $('#soundBtn'); if (sb) sb.addEventListener('click', toggleSound); setupMusic();
+  const sb = $('#soundBtn'); if (sb) sb.addEventListener('click', toggleSound); setupMusic(); setupTune();
   // первая картина — до старта, остальные — фоном
   // мазки: из запечённого файла (tools/krym/bake.js), иначе считаем в браузере
   const loadStrokes = async (k, img, dimg) => {
