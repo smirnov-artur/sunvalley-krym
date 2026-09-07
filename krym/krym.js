@@ -561,6 +561,7 @@ function createRenderer(canvas, map, T) {
     const um = new THREE.RawShaderMaterial({ ...underMatBase, uniforms: { uDepth: { value: texDepth }, uImg: { value: texImg }, uHaze: uS.uHaze, uHazeK: uS.uHazeK, uDepthScale: uS.uDepthScale, uLight: uS.uLight, uTime: uS.uTime, uShow: uS.uShow, uMask: { value: blankMask }, uNoise: { value: noiseTex }, uNow: { value: blankMask }, uNowFit: { value: new THREE.Vector4(1, 1, 0, 0) }, uWipe: { value: 0 }, uHazeBoost: uS.uHazeBoost, uGloss: uS.uGloss, uExposure: uS.uExposure, uFlowW: uS.uFlowW, uFlowS: uS.uFlowS, uWarm: uS.uWarm, uFx: uS.uFx, uLife: uS.uLife, uGust: uS.uGust, uFlicker: uS.uFlicker, uLightCol: uS.uLightCol } });
     const under = new THREE.Mesh(new THREE.PlaneGeometry(W, Hh, 180, 100), um); under.renderOrder = 1; under.frustumCulled = false; under.visible = false;
     paintScene.add(under, mesh); S.mesh = mesh; S.under = under; S.ready = true; addFx(k);
+    if (active === k) { active = -1; setActive(k); }   // глава уже открыта, а полотно догрузилось только сейчас: показать его
   }
   // походка по сценам: [dx, dy] в долях роста, уменьшение, секунды
   const WALK = { house: [0.0, 0.14, 0.03, 18], harvest: [0.09, 0.0, 0.0, 22] };
@@ -760,7 +761,9 @@ function applyTimeline(Pv, time) {
   if (chapter >= 0) {
     R.setActive(chapter);
     const C = CH[chapter], S = R.scenes[chapter];
-    const pc = R.paintCam; const Hh = W / S.aspect;
+    // полотно ещё не догрузилось (медленная сеть, быстрый скролл): держим рельеф в дымке, а не чёрный экран; догрузилось — проступает за секунду
+    if (!S.ready) { mixv = 0; fogv = Math.max(fogv, 0.85); } else { if (S.shownAt == null) S.shownAt = time; mixv *= smooth((time - S.shownAt) / 1.2); }
+    const pc = R.paintCam; const Hh = W / (S.aspect || 1.6);
     const tf = Math.tan(THREE.MathUtils.degToRad(pc.fov) / 2);
     const D0 = Math.min((Hh / 2) / tf, (W / 2) / (tf * pc.aspect)) * 0.86;
     const D = DIR[C.id] || DIR._; const hs = smooth(hold);
