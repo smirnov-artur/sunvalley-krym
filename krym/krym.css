@@ -128,8 +128,9 @@ body.far .mark b { font-size: 13px; }
 #prologue { position: fixed; inset: 0; z-index: 38; overflow: hidden; background: transparent; }   /* фона нет: створки закрывают экран сами, а при открытии за ними сразу карта */
 #prologue[hidden] { display: none; }
 #prologue .leaf { position: absolute; top: 0; bottom: 0; width: 50%; overflow: hidden; transition: transform 1.8s cubic-bezier(.65,.02,.25,1) .45s; will-change: transform; }
-#prologue .leaf.l { left: 0; } #prologue .leaf.r { right: 0; }
-#prologue .leaf img { position: absolute; top: 0; width: 100vw; height: 100%; object-fit: cover; object-position: 38% 45%; transform: scale(1.06); transition: transform 9s ease-out; }
+#prologue { --seam: 45.9%; }   /* шов настоящих створок в кадре (середина солнца) — по нему и открываем */
+#prologue .leaf.l { left: 0; width: var(--seam); } #prologue .leaf.r { right: 0; width: calc(100% - var(--seam)); }
+#prologue .leaf img { position: absolute; top: 0; width: 100vw; height: 100%; object-fit: cover; object-position: 50% 50%; transform: scale(1.06); transition: transform 9s ease-out; }
 #prologue .leaf.l img { left: 0; } #prologue .leaf.r img { right: 0; }
 #prologue.in .leaf img { transform: scale(1.0); }
 #prologue.open .leaf.l { transform: translateX(-103%); } #prologue.open .leaf.r { transform: translateX(103%); }
