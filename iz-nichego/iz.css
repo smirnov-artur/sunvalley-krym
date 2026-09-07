@@ -1,0 +1,139 @@
+:root {
+  --ink: #0c0a08;
+  --ink-2: #14100c;
+  --paper: #efe6d6;
+  --paper-2: #cbbfa9;
+  --gold: #cfae74;
+  --gold-hi: #e8cf9a;
+  --hair: rgba(207, 174, 116, .32);
+  --serif: 'Cormorant', 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --sans: 'Golos Text', 'Helvetica Neue', Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+html { background: var(--ink); color: var(--paper); scroll-behavior: auto; }
+html, body { margin: 0; padding: 0; }
+body { font-family: var(--sans); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+a { color: inherit; text-decoration: none; }
+::selection { background: var(--gold); color: var(--ink); }
+
+#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+#track { position: relative; z-index: 1; pointer-events: none; }
+
+/* ---------- прелоадер ---------- */
+#loader { position: fixed; inset: 0; z-index: 50; background: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; transition: opacity 1.2s ease; }
+#loader.out { opacity: 0; pointer-events: none; }
+#loader .mark { font-family: var(--serif); font-weight: 300; font-size: 22px; letter-spacing: .34em; text-transform: uppercase; color: var(--paper-2); text-indent: .34em; }
+#loader .bar { width: 180px; height: 1px; background: rgba(207,174,116,.18); position: relative; overflow: hidden; }
+#loader .bar i { position: absolute; left: 0; top: 0; height: 100%; width: 0; background: var(--gold); transition: width .35s ease; }
+#loader .cap { font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: rgba(239,230,214,.42); }
+
+/* ---------- ворота 18+ ---------- */
+#gate { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; background: rgba(12,10,8,.72); backdrop-filter: blur(6px); transition: opacity .9s ease; }
+#gate.out { opacity: 0; pointer-events: none; }
+#gate[hidden] { display: none; }
+#gate .box { text-align: center; max-width: 520px; padding: 0 24px; }
+#gate .q { font-family: var(--serif); font-weight: 300; font-size: clamp(30px, 4vw, 46px); line-height: 1.1; margin: 0 0 12px; }
+#gate .s { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: rgba(239,230,214,.55); margin: 0 0 34px; }
+#gate .row { display: flex; gap: 16px; justify-content: center; }
+.btn { display: inline-block; font-family: var(--sans); font-size: 12px; letter-spacing: .24em; text-transform: uppercase; padding: 17px 34px; border: 1px solid var(--gold); color: var(--gold); background: transparent; cursor: pointer; border-radius: 0; transition: background .35s, color .35s; text-indent: .24em; }
+.btn:hover { background: var(--gold); color: var(--ink); }
+.btn.ghost { border-color: rgba(239,230,214,.25); color: rgba(239,230,214,.6); }
+.btn.ghost:hover { background: transparent; color: var(--paper); border-color: var(--paper); }
+
+/* ---------- шапка ---------- */
+.top { position: fixed; top: 0; left: 0; right: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; padding: 26px 40px; pointer-events: none; mix-blend-mode: normal; opacity: 0; transition: opacity 1.4s ease .3s; }
+.top.on { opacity: 1; }
+.top.hide { opacity: 0; pointer-events: none; transition-delay: 0s; transition-duration: .5s; }
+.top > * { pointer-events: auto; }
+.wordmark { display: flex; align-items: baseline; gap: 14px; font-family: var(--serif); font-weight: 400; font-size: 17px; letter-spacing: .3em; text-transform: uppercase; color: var(--paper); }
+.wordmark small { font-family: var(--sans); font-size: 10px; letter-spacing: .28em; color: var(--gold); }
+.nav { display: flex; gap: 34px; font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: rgba(239,230,214,.72); }
+.nav a { position: relative; padding: 6px 0; transition: color .3s; }
+.nav a::after { content: ''; position: absolute; left: 0; right: 100%; bottom: 0; height: 1px; background: var(--gold); transition: right .4s cubic-bezier(.2,.7,.2,1); }
+.nav a:hover { color: var(--paper); }
+.nav a:hover::after { right: 0; }
+.nav .sound { color: var(--gold); }
+
+/* ---------- слой текста ---------- */
+#hud { position: fixed; inset: 0; z-index: 20; pointer-events: none; }
+.stop { position: absolute; opacity: 0; will-change: opacity, transform; }
+.stop > * { pointer-events: auto; }
+.eyebrow { font-size: 11px; letter-spacing: .26em; text-transform: uppercase; color: var(--gold); margin: 0 0 22px; display: flex; align-items: center; gap: 14px; }
+.eyebrow::before { content: ''; width: 34px; height: 1px; background: var(--gold); opacity: .7; }
+.stop h1, .stop h2 { font-family: var(--serif); font-weight: 300; line-height: 1.02; margin: 0; letter-spacing: -.005em; color: var(--paper); text-wrap: balance; }
+.stop h1 { font-size: clamp(46px, 7.4vw, 124px); }
+.stop h2 { font-size: clamp(30px, 4.1vw, 66px); line-height: 1.08; }
+.stop em { font-style: italic; color: var(--gold-hi); }
+.stop p { font-size: 15px; line-height: 1.65; color: rgba(239,230,214,.72); max-width: 520px; margin: 24px 0 0; }
+.stop .facts { font-family: var(--serif); font-size: 18px; letter-spacing: .04em; color: var(--paper-2); margin: 26px 0 0; display: flex; flex-wrap: wrap; gap: 8px 22px; }
+.stop .facts b { font-weight: 400; color: var(--gold-hi); font-variant-numeric: lining-nums; }
+.stop .facts i { font-style: normal; opacity: .55; }
+
+.s-hero { left: 40px; bottom: 92px; max-width: 900px; }
+.s-hero h1 { font-size: clamp(50px, 8.2vw, 138px); line-height: .98; }
+.s-hero p { max-width: 560px; }
+.s-hero .num { font-family: var(--serif); font-weight: 300; font-size: 13px; letter-spacing: .32em; text-transform: uppercase; color: var(--gold); }
+
+.s-year { left: 40px; top: 50%; transform: translateY(-50%); max-width: 600px; }
+.s-cellar { right: 48px; top: 50%; transform: translateY(-50%); max-width: 560px; text-align: left; }
+.s-vines { left: 40px; bottom: 96px; max-width: 760px; }
+.s-today { left: 40px; top: 15%; max-width: 640px; }
+.s-today .cta { display: flex; align-items: center; gap: 28px; margin-top: 40px; }
+.s-today .more { font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: rgba(239,230,214,.6); border-bottom: 1px solid var(--hair); padding-bottom: 4px; transition: color .3s, border-color .3s; }
+.s-today .more:hover { color: var(--paper); border-color: var(--paper); }
+
+.hint { position: absolute; right: 44px; bottom: 44px; display: flex; flex-direction: column; align-items: center; gap: 14px; font-size: 10px; letter-spacing: .3em; text-transform: uppercase; color: rgba(239,230,214,.5); opacity: 0; transition: opacity 1s ease; }
+.hint.on { opacity: 1; }
+.hint i { display: block; width: 1px; height: 56px; background: linear-gradient(to bottom, var(--gold), transparent); animation: hint 2.6s ease-in-out infinite; transform-origin: top; }
+@keyframes hint { 0% { transform: scaleY(0); opacity: 0; } 30% { opacity: 1; } 100% { transform: scaleY(1); opacity: 0; } }
+
+/* мягкая тень под текстом — чтобы заголовки читались поверх рельефа */
+.stop::before { content: ''; position: absolute; inset: -18% -22% -22% -28%; z-index: -1; pointer-events: none; background: radial-gradient(ellipse at 38% 50%, rgba(12,10,8,.62) 0%, rgba(12,10,8,.38) 38%, rgba(12,10,8,0) 70%); }
+.s-cellar::before { background: radial-gradient(ellipse at 55% 50%, rgba(12,10,8,.66) 0%, rgba(12,10,8,.4) 40%, rgba(12,10,8,0) 72%); }
+
+/* метки долины */
+.mark { position: absolute; transform: translate(-50%, -50%); opacity: 0; pointer-events: none; }
+.mark i { display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--gold-hi); box-shadow: 0 0 18px 4px rgba(232,207,154,.5); margin: 0 auto; }
+.mark b { position: absolute; left: 16px; top: -6px; white-space: nowrap; font-weight: 400; font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--paper); }
+.mark small { position: absolute; left: 16px; top: 12px; white-space: nowrap; font-size: 10px; letter-spacing: .1em; color: rgba(239,230,214,.5); }
+
+/* ---------- подвал страницы ---------- */
+footer { position: relative; z-index: 5; background: var(--ink); color: var(--paper); padding: 110px 40px 60px; border-top: 1px solid var(--hair); }
+footer .grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 60px; max-width: 1400px; margin: 0 auto; }
+footer h4 { font-size: 11px; letter-spacing: .26em; text-transform: uppercase; color: var(--gold); margin: 0 0 22px; font-weight: 400; }
+footer ul { list-style: none; margin: 0; padding: 0; }
+footer li { padding: 14px 0; border-top: 1px solid rgba(207,174,116,.16); display: flex; gap: 22px; align-items: baseline; }
+footer li:last-child { border-bottom: 1px solid rgba(207,174,116,.16); }
+footer li time { font-family: var(--serif); font-size: 15px; color: var(--paper-2); min-width: 90px; font-variant-numeric: lining-nums; }
+footer li span { font-family: var(--serif); font-size: 21px; font-weight: 300; }
+footer p { margin: 0 0 12px; color: rgba(239,230,214,.7); font-size: 14px; line-height: 1.7; }
+footer p b { font-weight: 400; color: var(--paper); }
+footer .legal { max-width: 1400px; margin: 90px auto 0; display: flex; justify-content: space-between; align-items: center; gap: 30px; font-size: 11px; letter-spacing: .1em; color: rgba(239,230,214,.4); flex-wrap: wrap; }
+footer .legal .age { font-family: var(--serif); font-size: 26px; color: var(--paper-2); letter-spacing: 0; }
+
+#stats { position: fixed; left: 12px; bottom: 10px; z-index: 60; font: 11px/1.4 monospace; color: #8f8; opacity: .8; pointer-events: none; white-space: pre; display: none; }
+
+@media (max-width: 900px) {
+  .top { padding: 18px 20px; }
+  .nav { display: none; }
+  .wordmark { font-size: 13px; letter-spacing: .26em; }
+  .wordmark small { display: none; }
+  .hint { display: none; }
+  .mark b, .mark small { display: none; }
+  .mark i { width: 6px; height: 6px; }
+  .btn { padding: 15px 22px; letter-spacing: .16em; text-indent: .16em; white-space: nowrap; }
+  .s-today .cta { gap: 18px; flex-wrap: wrap; }
+  .stop::before { inset: -12% -10% -12% -12%; }
+  .s-hero, .s-year, .s-vines, .s-today { left: 20px; right: 20px; max-width: none; }
+  .s-hero { bottom: auto; top: 96px; }
+  .s-hero p { font-size: 14px; }
+  .s-hero h1 { font-size: clamp(40px, 12vw, 70px); }
+  .stop h2 { font-size: clamp(26px, 7vw, 40px); }
+  .s-cellar { right: 20px; left: 20px; top: auto; bottom: 80px; transform: none; max-width: none; }
+  .hint { right: 20px; bottom: 20px; }
+  footer { padding: 70px 20px 40px; }
+  footer .grid { grid-template-columns: 1fr; gap: 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hint i { animation: none; }
+}

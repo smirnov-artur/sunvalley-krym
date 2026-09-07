@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Солнечная Долина · Крым, написанный великими</title>
+<link rel="stylesheet" href="../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../iz-nichego/iz.css">
+<link rel="stylesheet" href="krym.css">
+<script type="importmap">{"imports":{"three":"../assets/vendor/three/three.module.min.js"}}</script>
+</head>
+<body>
+
+<canvas id="gl"></canvas>
+
+<div id="loader">
+  <div class="mark">Солнечная Долина</div>
+  <div class="bar"><i></i></div>
+  <div class="cap">Крым, написанный великими</div>
+</div>
+
+<div id="gate" hidden>
+  <div class="box">
+    <p class="q">Вам уже есть восемнадцать?</p>
+    <p class="s">Сайт винодельни — только для совершеннолетних</p>
+    <div class="row">
+      <button class="btn" id="gateYes">Да, есть</button>
+      <a class="btn ghost" href="https://sunvalley1888.ru">Нет</a>
+    </div>
+  </div>
+</div>
+
+<header class="top" id="top">
+  <a class="wordmark" href="#"><span>Солнечная Долина</span><small>Архадерессе · 1888</small></a>
+  <nav class="nav">
+    <a href="#">История</a>
+    <a href="#">Вина</a>
+    <a href="#">Экскурсии</a>
+    <a href="#">Контакты</a>
+    <a class="set" id="setLink" href="originals.html" title="Та же дорога только по полотнам мастеров и фотографиям">Только оригиналы</a>
+    <button class="sound" id="soundBtn" type="button" aria-pressed="false">Звук</button>
+    <button class="sound music" id="musicBtn" type="button" aria-pressed="false" hidden>Музыка</button>
+  </nav>
+</header>
+
+<div id="hud">
+  <section class="stop s-hero">
+    <p class="eyebrow">Крым, написанный великими</p>
+    <h1>Дорога к одной<br><em>долине.</em></h1>
+    <p>Айвазовский, Куинджи, Коровин, Богаевский писали этот берег. Их полотна стоят на своих местах, и по ним, век за веком, дорога приводит в Солнечную Долину.</p>
+  </section>
+
+  <section class="stop s-chapter" id="chapter">
+    <div class="big" id="chBig"></div>
+    <p class="eyebrow" id="chYear">…</p>
+    <h2 id="chTitle">…</h2>
+    <p class="painter" id="chPainter">…</p>
+    <p id="chText">…</p>
+  </section>
+
+  <button id="now" type="button" title="Показать, как это место выглядит сегодня"><img id="nowImg" alt=""><span class="t">Это место сегодня</span><span class="c" id="nowCap"></span></button>
+  <section class="stop" id="finale">
+    <p class="eyebrow">Дорога привела</p>
+    <h2>Приезжайте в <em>Солнечную Долину.</em></h2>
+    <p>Дегустационный комплекс «Архадерессе», Судак, с. Миндальное. Подвалы Голицына, четырнадцать градусов, вино, которого нет больше нигде.</p>
+    <a class="btn" href="#">Записаться на экскурсию</a>
+  </section>
+  <div id="marks"></div>
+  <div id="years"></div>
+  <div class="hint" id="hint"><span>Листайте</span><i></i></div>
+</div>
+
+<div id="track"></div>
+
+<footer>
+  <div class="grid">
+    <div>
+      <h4>Полотна</h4>
+      <p id="credits">Все картины на этой странице — общественное достояние. Репродукции — Викисклад.</p>
+      <p id="nowCredits"></p>
+    </div>
+    <div>
+      <h4>Приехать</h4>
+      <p><b>Дегустационный комплекс «Архадерессе»</b><br>Судак, с. Миндальное, ул. Миндальная, 8А</p>
+      <p>Экскурсии и дегустации<br><b>+7 (978) 956-33-22</b></p>
+    </div>
+    <div>
+      <h4>Контакты</h4>
+      <p><b>АО «Солнечная Долина»</b><br>298025, Республика Крым, г. Судак, с. Солнечная Долина, ул. Черноморская, 23</p>
+      <p><b>+7 (978) 856-42-42</b><br>office@sunvalley1888.ru</p>
+    </div>
+  </div>
+  <div class="legal">
+    <span class="age">18+</span>
+    <span>Чрезмерное употребление алкоголя вредит вашему здоровью</span>
+    <span>© 1888 — 2026 · Солнечная Долина · Архадерессе</span>
+  </div>
+</footer>
+
+<div id="stats"></div>
+<script type="module" src="krym.js"></script>
+</body>
+</html>

@@ -1,0 +1,113 @@
+/* «Крым, написанный великими»: поверх iz.css */
+.s-hero { left: 40px; bottom: 84px; max-width: 860px; }
+.s-hero h1 { font-size: clamp(52px, 8vw, 136px); line-height: .96; }
+.s-chapter { left: 40px; bottom: 84px; max-width: 640px; }
+.s-chapter h2 { font-size: clamp(30px, 3.6vw, 56px); }
+.s-chapter .painter { font-family: var(--serif); font-size: 19px; color: var(--gold-hi); margin: 14px 0 0; letter-spacing: .02em; }
+.s-chapter p { margin-top: 16px; }
+.stop::before { background: radial-gradient(ellipse at 34% 60%, rgba(12,10,8,.66) 0%, rgba(12,10,8,.4) 40%, rgba(12,10,8,0) 72%); }
+.mark { position: absolute; transform: translate(-50%, -50%); opacity: 0; pointer-events: none; transition: none; }
+.mark i { display: block; width: 6px; height: 6px; border-radius: 50%; background: var(--gold-hi); box-shadow: 0 0 14px 3px rgba(232,207,154,.45); margin: 0 auto; }
+.mark.on i { width: 10px; height: 10px; box-shadow: 0 0 22px 6px rgba(232,207,154,.6); }
+.mark b { position: absolute; left: 14px; top: -8px; white-space: nowrap; font-weight: 400; font-family: var(--serif); font-size: 15px; color: var(--paper); font-variant-numeric: lining-nums; }
+.mark small { position: absolute; left: 14px; top: 10px; white-space: nowrap; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: rgba(239,230,214,.55); }
+body.far .mark small { display: none; }
+body.far .mark b { font-size: 12px; }
+body.far .mark:nth-child(2n) b { top: 6px; }
+@media (max-width: 900px) {
+  .s-hero, .s-chapter { left: 20px; right: 20px; max-width: none; bottom: 80px; }
+  .mark b, .mark small { display: none; }
+}
+
+/* переключатель версий и звук в шапке */
+.nav .set { color: var(--gold); opacity: .85; }
+.nav .set:hover { opacity: 1; }
+.nav .sound { background: none; border: 0; padding: 6px 0; font: inherit; letter-spacing: inherit; text-transform: inherit; color: rgba(239,230,214,.72); cursor: pointer; position: relative; }
+.nav .sound::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; border: 1px solid var(--gold); margin-right: 8px; vertical-align: 1px; }
+.nav .sound[aria-pressed="true"] { color: var(--paper); }
+.nav .sound[aria-pressed="true"]::before { background: var(--gold); box-shadow: 0 0 8px var(--gold); }
+
+/* метки: скрытые подписи в тесноте; названия морей */
+.mark.dot b, .mark.dot small { opacity: 0; transition: opacity .4s; }
+.sea { position: absolute; transform: translate(-50%, -50%); font-family: var(--serif); font-style: italic; font-size: 13px; letter-spacing: .28em; color: rgba(239,230,214,.42); white-space: nowrap; pointer-events: none; transition: opacity .8s; }
+
+/* карточка «это место сегодня» */
+#now { position: absolute; right: 40px; bottom: 44px; width: 220px; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; opacity: 0; visibility: hidden; transform: translateY(14px); transition: opacity .8s ease, transform .8s ease, visibility 0s .8s; pointer-events: auto; font: inherit; color: var(--paper); }
+#now.on { opacity: 1; visibility: visible; transform: none; transition: opacity .8s ease .3s, transform .8s ease .3s, visibility 0s; }
+#now img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border: 1px solid rgba(239,230,214,.25); box-shadow: 0 18px 40px rgba(0,0,0,.45); transition: border-color .4s; }
+#now:hover img, #now.open img { border-color: var(--gold); }
+#now .t { display: block; margin-top: 10px; font-family: var(--sans); font-size: 10px; letter-spacing: .26em; text-transform: uppercase; color: var(--gold); }
+#now .c { display: block; margin-top: 4px; font-size: 11px; color: rgba(239,230,214,.55); line-height: 1.4; }
+#now.open .t::after { content: ' · вернуть картину'; color: rgba(239,230,214,.6); }
+@media (max-width: 900px) { #now { right: 16px; bottom: auto; top: 64px; width: 118px; } #now .c { display: none; } }
+
+/* восход: заголовок появляется после того, как свет лёг на рельеф */
+.s-hero > * { opacity: 0; transform: translateY(22px); transition: opacity 1.6s ease, transform 1.6s cubic-bezier(.2,.7,.2,1); }
+body.title .s-hero > * { opacity: 1; transform: none; }
+body.title .s-hero > :nth-child(2) { transition-delay: .25s; } body.title .s-hero > :nth-child(3) { transition-delay: .55s; }
+/* глава: год крупно за заголовком, слова по очереди */
+.s-chapter { position: absolute; }
+.s-chapter .big { position: absolute; left: -4px; bottom: calc(100% - 46px); font-family: var(--serif); font-weight: 300; font-size: clamp(90px, 11vw, 190px); line-height: 1; letter-spacing: -.03em; color: rgba(239,230,214,.07); pointer-events: none; user-select: none; }
+.s-chapter h2 span { display: inline-block; opacity: 0; transform: translateY(.55em); transition: opacity .9s ease, transform 1.1s cubic-bezier(.2,.7,.2,1); transition-delay: calc(var(--i, 0) * 80ms); }
+.s-chapter.in h2 span { opacity: 1; transform: none; }
+.s-chapter .painter, .s-chapter p:last-child { opacity: 0; transform: translateY(12px); transition: opacity 1s ease .45s, transform 1s ease .45s; }
+.s-chapter p:last-child { transition-delay: .65s; }
+.s-chapter.in .painter, .s-chapter.in p:last-child { opacity: 1; transform: none; }
+/* лента лет */
+#years { position: absolute; left: 40px; right: 40px; bottom: 34px; height: 1px; background: rgba(239,230,214,.16); opacity: 0; transition: opacity .8s; pointer-events: none; }
+#years.on { opacity: 1; }
+#years .y { position: absolute; top: -4px; transform: translateX(-50%); font-family: var(--sans); font-size: 9px; letter-spacing: .18em; color: rgba(239,230,214,.4); padding-top: 12px; }
+#years .y::before { content: ''; position: absolute; left: 50%; top: 0; width: 1px; height: 8px; background: rgba(239,230,214,.35); }
+#years .y.on { color: var(--gold); }
+#years .y.on::before { background: var(--gold); height: 12px; top: -2px; }
+#years .pos { position: absolute; top: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 10px var(--gold); transform: translateX(-50%); transition: left .3s ease-out; }
+@media (max-width: 900px) { #years { left: 20px; right: 20px; bottom: 26px; } #years .y { display: none; } #years .y.on { display: block; } .s-chapter .big { font-size: 80px; } }
+
+/* названия городов на карте */
+.sea.city { font-style: normal; font-family: var(--sans); font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: rgba(239,230,214,.5); }
+.sea.city::before { content: ''; display: inline-block; width: 3px; height: 3px; border-radius: 50%; background: rgba(239,230,214,.6); margin: 0 7px 2px 0; }
+/* светлые полотна: тёмный крупный год */
+.s-chapter.light .big { color: rgba(20,16,12,.10); }
+/* лента лет кликабельна */
+#years.on { pointer-events: auto; } #years .y { cursor: pointer; pointer-events: auto; } #years .y:hover { color: var(--paper); }
+/* финал */
+#finale { position: absolute; left: 40px; right: 40px; bottom: 84px; max-width: 700px; opacity: 0; visibility: hidden; transform: translateY(18px); transition: opacity 1.2s ease, transform 1.2s ease, visibility 0s 1.2s; pointer-events: none; }
+#finale.on { opacity: 1; visibility: visible; transform: none; pointer-events: auto; transition: opacity 1.2s ease .2s, transform 1.2s ease .2s, visibility 0s; }
+#finale h2 { font-family: var(--serif); font-weight: 300; font-size: clamp(34px, 4.2vw, 64px); line-height: 1.05; margin: 0 0 18px; }
+#finale h2 em { font-style: italic; color: var(--gold-hi); }
+#finale p { margin: 0 0 22px; max-width: 520px; }
+#finale .btn { display: inline-block; }
+/* ворота 18+ в тоне страницы */
+#gate { background: rgba(10,8,6,.86); }
+#gate .q::before { content: ''; display: block; width: 46px; height: 46px; margin: 0 auto 26px; border-radius: 50%; border: 1px solid var(--gold); box-shadow: 0 0 24px rgba(232,194,122,.35), inset 0 0 12px rgba(232,194,122,.35); }
+@media (max-width: 900px) { #finale { left: 20px; right: 20px; bottom: 90px; } }
+
+/* подсказка: тонкая линия течёт вниз */
+#hint i { position: relative; display: block; width: 1px; height: 38px; margin: 10px auto 0; background: rgba(239,230,214,.18); overflow: hidden; }
+#hint i::after { content: ''; position: absolute; left: 0; top: -40%; width: 100%; height: 40%; background: var(--gold); animation: hintflow 2.2s cubic-bezier(.4,0,.2,1) infinite; }
+@keyframes hintflow { 0% { top: -40%; opacity: 0; } 20% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+
+/* названия гор при подлёте */
+.sea.peak { font-size: 11px; letter-spacing: .2em; color: rgba(239,230,214,.5); text-transform: uppercase; font-style: normal; font-family: var(--serif); }
+.sea.peak::before { content: "B2"; font-size: 7px; margin-right: 6px; vertical-align: 2px; color: var(--gold); opacity: .8; }
+
+.nav .music[hidden] { display: none; }
+
+/* читаемость на светлых полотнах: мягкая тень снизу на всю ширину, тень под шапкой, сильнее — когда полотно светлое */
+#hud::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 44vh; pointer-events: none; z-index: 0; background: linear-gradient(to top, rgba(10,8,6,.62) 0%, rgba(10,8,6,.34) 38%, rgba(10,8,6,0) 100%); opacity: .75; transition: opacity 1.2s ease; }
+body.lightch #hud::after { opacity: 1; }
+body.far #hud::after { opacity: .35; }
+#hud > * { z-index: 1; }
+.top { background: linear-gradient(to bottom, rgba(10,8,6,.5) 0%, rgba(10,8,6,.22) 55%, rgba(10,8,6,0) 100%); padding-bottom: 40px; }
+.s-chapter::before { inset: -30% -34% -40% -40%; background: radial-gradient(ellipse at 36% 55%, rgba(12,10,8,.58) 0%, rgba(12,10,8,.34) 40%, rgba(12,10,8,0) 72%); }
+.s-chapter.light::before { background: radial-gradient(ellipse at 36% 55%, rgba(12,10,8,.72) 0%, rgba(12,10,8,.44) 42%, rgba(12,10,8,0) 74%); }
+.s-chapter h2, .s-hero h1 { text-shadow: 0 1px 2px rgba(0,0,0,.45), 0 0 28px rgba(0,0,0,.35); }
+.s-chapter p, .s-chapter .painter, .s-chapter .eyebrow, .s-hero p, .s-hero .eyebrow { text-shadow: 0 1px 2px rgba(0,0,0,.55), 0 0 18px rgba(0,0,0,.35); }
+.s-chapter p { color: rgba(239,230,214,.86); }
+.s-chapter .big { color: rgba(239,230,214,.10); }
+.s-chapter.light .big { color: rgba(20,16,12,.13); }
+#years .y { color: rgba(239,230,214,.55); text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+#years .y::before { background: rgba(239,230,214,.5); }
+#now .c, #now .t { text-shadow: 0 1px 2px rgba(0,0,0,.7); }
+#now .c { color: rgba(239,230,214,.72); }
+#now img { box-shadow: 0 18px 40px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.25); }

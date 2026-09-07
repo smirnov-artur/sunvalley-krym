@@ -1,0 +1,1 @@
+{"z":12,"x0":2428,"y0":1477,"nx":14,"ny":7,"w":3584,"h":1792,"lonW":33.3984375,"lonE":34.62890625,"latN":44.777935896316215,"latS":44.33956524809714,"encoding":"terrarium: h = R*256 + G + B/256 - 32768","source":"AWS Terrain Tiles (Mapzen), 2026-09-06","width":1792,"height":896,"kmPerPx":0.054,"pack":"v=(h+500)*8, R hi, G lo","blue":"none"}

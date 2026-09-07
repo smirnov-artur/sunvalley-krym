@@ -1,0 +1,12 @@
+{ "w": 1376, "h": 768,
+ "figures": [
+  { "x": 24, "y": 446, "w": 146, "h": 158, "feetY": 565, "cx": 92, "walker": false, "area": 8342 },
+  { "x": 167, "y": 644, "w": 101, "h": 124, "feetY": 683, "cx": 209, "walker": false, "area": 6045 },
+  { "x": 233, "y": 351, "w": 62, "h": 130, "feetY": 474, "cx": 264, "walker": true, "area": 3070 },
+  { "x": 241, "y": 501, "w": 92, "h": 207, "feetY": 618, "cx": 300, "walker": false, "area": 7881 },
+  { "x": 353, "y": 667, "w": 89, "h": 101, "feetY": 760, "cx": 402, "walker": false, "area": 4839 },
+  { "x": 471, "y": 579, "w": 86, "h": 107, "feetY": 656, "cx": 509, "walker": false, "area": 4275 },
+  { "x": 495, "y": 267, "w": 156, "h": 76, "feetY": 314, "cx": 537, "walker": false, "area": 3719 },
+  { "x": 564, "y": 559, "w": 200, "h": 177, "feetY": 706, "cx": 660, "walker": false, "area": 13376 },
+  { "x": 561, "y": 513, "w": 70, "h": 63, "feetY": 558, "cx": 614, "walker": false, "area": 1217 },
+  { "x": 639, "y": 158, "w": 715, "h": 572, "feetY": 704, "cx": 980, "walker": false, "area": 162970 } ] }
